@@ -3,25 +3,29 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 project(Raytracer)
 
 include_directories (
-        src
+	src
+	externals/SDL/include
+	externals/vkbootstrap/src
+	externals/vma/include
 )
 
-set (
-	program_source
-
-	src/main.cpp
+link_directories(
+	${PROJECT_SOURCE_DIR}/contrib/Generic/lib
 )
 
-add_executable(Raytracer
-	${program_source}
-)
+add_definitions(-DSDL_MAIN_HANDLED)
+set(SDL_DISABLE_SDL3MAIN ON)
+set(SDL_SHARED OFF)
+set(SDL_STATIC ON)
+set(SDL_TEST OFF)
+set(SDL_SUBPROJECT ON)
+set(SDL_DISABLE_UNINSTALL ON)
+set(DSDL_EXAMPLES OFF)
+add_subdirectory("externals/SDL")
+set_target_properties(SDL_uclibc SDL3_test SDL3-static PROPERTIES FOLDER Externals)
 
-foreach(source IN LISTS program_source)
-    get_filename_component(source_path "${source}" PATH)
-    string(REPLACE "/" "\\" source_path_msvc "${source_path}")
-    source_group("${source_path_msvc}" FILES "${source}")
-endforeach()
+add_subdirectory("externals/vma")
+add_subdirectory("externals/vk-bootstrap")
+set_target_properties(vk-bootstrap PROPERTIES FOLDER Externals)
 
-set_target_properties(Raytracer PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<1:${CMAKE_SOURCE_DIR}/Image>)
-set_property(TARGET Raytracer PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/Image")
-target_compile_features(Raytracer PRIVATE cxx_std_20)
+add_subdirectory("src")
