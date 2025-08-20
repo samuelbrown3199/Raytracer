@@ -3,12 +3,14 @@ set (
 
 	main.cpp
 
-	Maths/Intersections.hpp
-	Maths/Vector.hpp
-	Maths/Ray.hpp
+	Renderers/Software/Common.h
+	Renderers/Software/Maths/Vector.h
+	Renderers/Software/Maths/Ray.h
+	Renderers/Software/Maths/Interval.h
+	Renderers/Software/Maths/Interval.cpp
 
-	Renderers/SoftwareRenderer.h
-	Renderers/SoftwareRenderer.cpp
+	Renderers/Software/SoftwareRenderer.h
+	Renderers/Software/SoftwareRenderer.cpp
 )
 
 add_executable(Raytracer

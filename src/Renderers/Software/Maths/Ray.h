@@ -1,6 +1,5 @@
-#pragma once
-
-#include "Vector.hpp"
+#ifndef RAY_H
+#define RAY_H
 
 class Ray
 {
@@ -28,3 +27,5 @@ public:
 		return m_origin + t * m_direction;
 	}
 };
+
+#endif

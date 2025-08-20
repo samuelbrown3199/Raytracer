@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "Renderers/SoftwareRenderer.h"
+#include "Renderers/Software/SoftwareRenderer.h"
 
 int main()
 {
@@ -20,6 +20,7 @@ int main()
 	case 0:
 		{
 			SoftwareRenderer renderer;
+			renderer.InitializeWorld();
 			renderer.RenderImage();
 		}
 		break;

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef VECTOR_H
+#define VECTOR_H
 
 #include <iostream>
 #include <cmath>
@@ -114,3 +115,5 @@ inline Colour3 Get255Color(const Colour3& c) {
 		255.999 * c.z()
 	);
 }
+
+#endif
