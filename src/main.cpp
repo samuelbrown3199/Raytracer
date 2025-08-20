@@ -1,29 +1,32 @@
 #include <iostream>
 
-#include <SDL3/SDL.h>
+#include "Renderers/SoftwareRenderer.h"
 
 int main()
 {
-	std::cout << "Hello, World!" << std::endl;
+	int mode = 0;
 
-	SDL_Window* window = SDL_CreateWindow("Hello World", 800, 600, SDL_WINDOW_VULKAN);
-	if (!window) {
-		std::cerr << "Failed to create window: " << SDL_GetError() << std::endl;
-		return 1;
-	}
+	std::cout << "Select raytracer mode:\n\n";
+	std::cout << "0: Software renderer (output one image file)\n\n";
 
-	bool run = true;
-	SDL_Event event;
-	while (run)
+	std::cout << "----------------------------------------------\n\n";
+
+	std::cout << "Enter mode number: ";
+
+	std::cin >> mode;
+
+	switch (mode)
 	{
-		while (SDL_PollEvent(&event))
+	case 0:
 		{
-			if (event.type == SDL_EVENT_QUIT)
-			{
-				run = false;
-				break;
-			}
+			SoftwareRenderer renderer;
+			renderer.RenderImage();
 		}
+		break;
+	default:
+		std::string errorMessage = "Unknown raytracer mode: " + mode;
+		std::cout << errorMessage << std::endl;
+		break;
 	}
 
 	return 0;

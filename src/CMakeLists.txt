@@ -2,6 +2,13 @@ set (
 	program_source
 
 	main.cpp
+
+	Maths/Intersections.hpp
+	Maths/Vector.hpp
+	Maths/Ray.hpp
+
+	Renderers/SoftwareRenderer.h
+	Renderers/SoftwareRenderer.cpp
 )
 
 add_executable(Raytracer

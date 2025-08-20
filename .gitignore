@@ -31,3 +31,4 @@
 *.pdb
 
 /build
+/Image/Output.png

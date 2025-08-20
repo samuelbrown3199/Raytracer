@@ -4,6 +4,7 @@ project(Raytracer)
 
 include_directories (
 	src
+	contrib/Generic/include
 	externals/SDL/include
 	externals/vkbootstrap/src
 	externals/vma/include
