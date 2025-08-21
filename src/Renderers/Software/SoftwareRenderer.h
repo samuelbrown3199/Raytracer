@@ -16,6 +16,14 @@ public:
 	int m_iWidth;
 	int m_iSamplesPerPixel = 10; // Number of samples per pixel
 	int m_iMaxDepth = 10; //Maximum number of ray bounces
+	double m_fov = 90.0f;
+
+	Vector3 m_lookFrom = Vector3(0.0, 0.0, 0.0);
+	Vector3 m_lookAt = Vector3(0.0, 0.0, -1.0);
+	Vector3 m_up = Vector3(0.0, 1.0, 0.0);
+
+	double m_defocusAngle = 0.0; // Variation in the angle of the rays for depth of field
+	double m_focusDistance = 1.0; // Distance from the camera to the perfect focus plane
 
 	void Render(const HittableList& world)
 	{
@@ -69,19 +77,29 @@ public:
 
 		m_pixelSampleScale = 1.0 / m_iSamplesPerPixel;
 
-		float focalLength = 1.0f;
-		float viewportHeight = 2.0f;
-		float viewportWidth = viewportHeight * (double(m_iWidth) / m_iHeight);
-		m_center = Vector3(0.0, 0.0, 0.0);
+		m_center = m_lookFrom;
 
-		auto viewportU = Vector3(viewportWidth, 0.0, 0.0);
-		auto viewportV = Vector3(0.0, -viewportHeight, 0.0);
+		auto theta = DegreesToRadians(m_fov);
+		auto h = std::tan(theta / 2.0);
+		float viewportHeight = 2 * h * m_focusDistance;
+		float viewportWidth = viewportHeight * (double(m_iWidth) / m_iHeight);
+
+		w = UnitVector(m_lookFrom - m_lookAt);
+		u = UnitVector(Cross(m_up, w));
+		v = Cross(w, u);
+
+		auto viewportU = viewportWidth * u;
+		auto viewportV = viewportHeight * -v;
 
 		m_pixelDeltaU = viewportU / m_iWidth;
 		m_pixelDeltaV = viewportV / m_iHeight;
 
-		auto viewportUpperLeft = m_center - Vector3(0, 0, focalLength) - viewportU / 2 - viewportV / 2;
+		auto viewportUpperLeft = m_center - (m_focusDistance *w) - viewportU / 2 - viewportV / 2;
 		m_pixel00Location = viewportUpperLeft + 0.5 * (m_pixelDeltaU + m_pixelDeltaV);
+
+		auto defocusRadius = m_focusDistance * std::tan(DegreesToRadians(m_defocusAngle / 2.0));
+		m_defocusDiskU = defocusRadius * u;
+		m_defocusDiskV = defocusRadius * v;
 	}
 
 private:
@@ -92,6 +110,10 @@ private:
 	Vector3   m_pixelDeltaU;  // Offset to pixel to the right
 	Vector3   m_pixelDeltaV;  // Offset to pixel below
 	double m_pixelSampleScale;
+	Vector3 u, v, w;
+
+	Vector3 m_defocusDiskU;
+	Vector3 m_defocusDiskV;
 
 	Colour3 RayColour(const Ray& r, int depth, const HittableList& world)
 	{
@@ -122,10 +144,16 @@ private:
 			+ ((x + offset.x()) * m_pixelDeltaU)
 			+ ((y + offset.y()) * m_pixelDeltaV);
 
-		auto ray_origin = m_center;
+		auto ray_origin = (m_defocusAngle <= 0) ? m_center : DefocusDiskSample();
 		auto ray_direction = pixel_sample - ray_origin;
 
 		return Ray(ray_origin, ray_direction);
+	}
+
+	Vector3 DefocusDiskSample() const
+	{
+		auto p = RandomInUnitDisk();
+		return m_center + p.x() * m_defocusDiskU + p.y() * m_defocusDiskV;
 	}
 
 	Vector3 SampleSquare() const

@@ -130,6 +130,16 @@ inline Vector3 UnitVector(const Vector3& v)
 	return v / v.Length();
 }
 
+inline Vector3 RandomInUnitDisk()
+{
+	while (true)
+	{
+		auto p = Vector3(RandomDouble(-1, 1), RandomDouble(-1, 1), 0);
+		if (p.SqrLength() < 1)
+			return p;
+	}
+}
+
 inline Vector3 RandomUnitVector()
 {
 	while (true)
