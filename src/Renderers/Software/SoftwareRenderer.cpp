@@ -14,7 +14,7 @@ void SoftwareRenderer::InitializeWorld()
 	auto materialCenter = std::make_shared<Lambertian>(Vector3(0.1, 0.2, 0.5));
 	auto materialLeft = std::make_shared<Dielectric>(1.50);
 	auto materialBubble = std::make_shared<Dielectric>(1.00 / 1.50);
-	auto materialRight = std::make_shared<Metal>(Vector3(0.8, 0.6, 0.2), 1.0);
+	auto materialRight = std::make_shared<Metal>(Vector3(0.8, 0.6, 0.2), 0.5);
 
 	m_world.Add(std::make_shared<Sphere>(Vector3(0, -100.5, -1), 100, materialGround));
 	m_world.Add(std::make_shared<Sphere>(Vector3(0, 0, -1.2), 0.5, materialCenter));
@@ -31,7 +31,7 @@ void SoftwareRenderer::RenderImage()
 	
 	Camera camera;
 	camera.aspectRatio = aspectRatio;
-	camera.m_iWidth = 720;
+	camera.m_iWidth = 576;
 	camera.m_iSamplesPerPixel = 100;
 	camera.m_iMaxDepth = 50;
 	camera.Initialize();
@@ -39,7 +39,7 @@ void SoftwareRenderer::RenderImage()
 	camera.Render(m_world);
 
 	auto endTime = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+	double duration = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count() / 1000.0f);
 
-	std::clog << "Rendering took " << duration.count() << " milliseconds.\n";
+	std::clog << "Rendering took " << duration << " seconds.\n";
 }
