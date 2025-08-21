@@ -155,6 +155,14 @@ inline Vector3 Reflect(const Vector3& v, const Vector3& n)
 	return v - 2 * Dot(v, n) * n;
 }
 
+inline Vector3 Refract(const Vector3& uv, const Vector3& n, double eta)
+{
+	auto cosTheta = std::fmin(Dot(-uv, n), 1.0);
+	Vector3 rOutPerp = eta * (uv + cosTheta * n);
+	Vector3 rOutParallel = -std::sqrt(std::fabs(1.0 - rOutPerp.SqrLength())) * n;
+	return rOutPerp + rOutParallel;
+}
+
 using Colour3 = Vector3;
 
 inline Colour3 Get255Color(const Colour3& c) {
