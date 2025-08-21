@@ -4,6 +4,8 @@
 #include <iostream>
 #include <cmath>
 
+#include "Interval.h"
+
 class Vector3
 {
 	double e[3];
@@ -62,6 +64,10 @@ public:
 		return *this;
 	}
 
+	Vector3 operator*(const Vector3& v) const {
+		return Vector3(e[0] * v.e[0], e[1] * v.e[1], e[2] * v.e[2]);
+	}
+
 	Vector3 operator/(double t) const {
 		return Vector3(e[0] / t, e[1] / t, e[2] / t);
 	}
@@ -80,6 +86,23 @@ public:
 	double SqrLength() const {
 		return e[0] * e[0] + e[1] * e[1] + e[2] * e[2];
 	}
+
+	static Vector3 Random()
+	{
+		return Vector3(RandomDouble(), RandomDouble(), RandomDouble());
+	}
+
+	static Vector3 Random(double min, double max)
+	{
+		return Vector3(RandomDouble(min, max), RandomDouble(min, max), RandomDouble(min, max));
+	}
+
+	bool NearZero() const
+	{
+		const double s = 1e-8;
+		return (fabs(e[0]) < s) && (fabs(e[1]) < s) && (fabs(e[2]) < s);
+	}
+
 };
 
 inline std::ostream& operator<<(std::ostream& out, const Vector3& v) {
@@ -102,17 +125,49 @@ inline Vector3 Cross(const Vector3& u, const Vector3& v) {
 	);
 }
 
-inline Vector3 UnitVector(const Vector3& v) {
+inline Vector3 UnitVector(const Vector3& v)
+{
 	return v / v.Length();
+}
+
+inline Vector3 RandomUnitVector()
+{
+	while (true)
+	{
+		auto p = Vector3::Random(-1, 1);
+		auto lensq = p.SqrLength();
+		if (1e-160 < lensq && lensq <= 1)
+			return p / sqrt(lensq);
+	}
+}
+
+inline Vector3 RandomOnHemisphere(const Vector3& normal)
+{
+	Vector3 onUnitSphere = RandomUnitVector();
+	if (Dot(onUnitSphere, normal) > 0)
+		return onUnitSphere;
+	else
+		return -onUnitSphere;
+}
+
+inline Vector3 Reflect(const Vector3& v, const Vector3& n)
+{
+	return v - 2 * Dot(v, n) * n;
 }
 
 using Colour3 = Vector3;
 
 inline Colour3 Get255Color(const Colour3& c) {
+
+	static const Interval intensity(0.000, 0.999);
+	int rbyte = int(256 * intensity.Clamp(c.x()));
+	int gbyte = int(256 * intensity.Clamp(c.y()));
+	int bbyte = int(256 * intensity.Clamp(c.z()));
+
 	return Colour3(
-		255.999 * c.x(),
-		255.999 * c.y(),
-		255.999 * c.z()
+		rbyte,
+		gbyte,
+		bbyte
 	);
 }
 

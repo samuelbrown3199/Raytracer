@@ -1,0 +1,108 @@
+#ifndef HITTABLE_H
+#define HITTABLE_H
+
+class Material;
+
+class HitRecord
+{
+public:
+
+	Vector3 p;
+	Vector3 normal;
+	std::shared_ptr<Material> mat;
+	double t;
+	bool frontFace;
+
+	void SetFaceNormal(const Ray& r, const Vector3& outwardNormal)
+	{
+		frontFace = Dot(r.Direction(), outwardNormal) < 0;
+		normal = frontFace ? outwardNormal : -outwardNormal;
+	}
+};
+
+class Hittable
+{
+public:
+	virtual ~Hittable() = default;
+	virtual bool Hit(const Ray& r, Interval t, HitRecord& rec) const = 0;
+};
+
+class Sphere : public Hittable
+{
+public:
+
+	Sphere(const Vector3& center, double radius, std::shared_ptr<Material> mat)
+		: center(center), radius(radius), mat(mat)
+	{
+
+	}
+
+	bool Hit(const Ray& r, Interval t, HitRecord& rec) const override
+	{
+		auto oc = center - r.Origin();
+		auto a = r.Direction().SqrLength();
+		auto h = Dot(r.Direction(), oc);
+		auto c = oc.SqrLength() - radius * radius;
+		auto discriminant = h * h - a * c;
+		if (discriminant < 0)
+			return false;
+
+		auto sqrtDiscriminant = std::sqrt(discriminant);
+		auto root = (h - sqrtDiscriminant) / a;
+		if (!t.Surrounds(root))
+		{
+			root = (h + sqrtDiscriminant) / a;
+			if (!t.Surrounds(root))
+				return false;
+		}
+
+		rec.t = root;
+		rec.p = r.PointAtT(rec.t);
+		Vector3 outwardNormal = (rec.p - center) / radius;
+		rec.SetFaceNormal(r, outwardNormal);
+		rec.mat = mat;
+
+		return true;
+	}
+
+private:
+	Vector3 center;
+	double radius;
+	std::shared_ptr<Material> mat;
+};
+
+class HittableList : public Hittable
+{
+public:
+	std::vector<std::shared_ptr<Hittable>> objects;
+
+	HittableList() {};
+	HittableList(std::shared_ptr<Hittable> object)
+	{
+		Add(object);
+	}
+
+	void Add(std::shared_ptr<Hittable> object)
+	{
+		objects.push_back(object);
+	}
+
+	bool Hit(const Ray& r, Interval t, HitRecord& rec) const override
+	{
+		HitRecord tempRec;
+		bool hitAnything = false;
+		double closestSoFar = t.max;
+		for (const auto& object : objects)
+		{
+			if (object->Hit(r, Interval(t.min, closestSoFar), tempRec))
+			{
+				hitAnything = true;
+				closestSoFar = tempRec.t;
+				rec = tempRec;
+			}
+		}
+		return hitAnything;
+	}
+};
+
+#endif
