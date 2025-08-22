@@ -54,6 +54,8 @@ void SoftwareRenderer::InitializeWorld()
 
 	auto material3 = std::make_shared<Metal>(Vector3(0.7, 0.6, 0.5), 0.0);
 	m_world.Add(std::make_shared<Sphere>(Vector3(4, 1, 0), 1.0, material3));
+
+	m_world = HittableList(std::make_shared<BVHNode>(m_world));
 }
 
 void SoftwareRenderer::RenderImage()

@@ -10,6 +10,12 @@ public:
 
 	Interval(double min, double max) : min(min), max(max) {}
 
+	Interval(const Interval& a, const Interval& b)
+	{
+		min = a.min <= b.min ? a.min : b.min;
+		max = a.max >= b.max ? a.max : b.max;
+	}
+
 	double Size() const 
 	{
 		return max - min;
@@ -30,6 +36,12 @@ public:
 		if (x < min) return min;
 		if (x > max) return max;
 		return x;
+	}
+
+	Interval Expand(double delta) const
+	{
+		auto padding = delta / 2;
+		return Interval(min - padding, max + padding);
 	}
 
 	static const Interval Empty, Universe;

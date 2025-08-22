@@ -6,6 +6,10 @@ set (
 	Renderers/Software/Material.h
 	Renderers/Software/Hittable.h
 	Renderers/Software/Common.h
+
+	Renderers/Software/Maths/AABB.h
+	Renderers/Software/Maths/AABB.cpp
+	Renderers/Software/Maths/BVH.h
 	Renderers/Software/Maths/Vector.h
 	Renderers/Software/Maths/Ray.h
 	Renderers/Software/Maths/Interval.h

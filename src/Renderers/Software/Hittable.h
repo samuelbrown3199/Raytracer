@@ -1,6 +1,8 @@
 #ifndef HITTABLE_H
 #define HITTABLE_H
 
+#include "Maths/AABB.h"
+
 class Material;
 
 class HitRecord
@@ -25,6 +27,8 @@ class Hittable
 public:
 	virtual ~Hittable() = default;
 	virtual bool Hit(const Ray& r, Interval t, HitRecord& rec) const = 0;
+
+	virtual AABB BoundingBox() const = 0;
 };
 
 class Sphere : public Hittable
@@ -34,7 +38,13 @@ public:
 	Sphere(const Vector3& center, double radius, std::shared_ptr<Material> mat)
 		: center(center), radius(radius), mat(mat)
 	{
+		auto rVec = Vector3(radius, radius, radius);
+		bbox = AABB(center - rVec, center + rVec);
+	}
 
+	AABB BoundingBox() const override
+	{
+		return bbox;
 	}
 
 	bool Hit(const Ray& r, Interval t, HitRecord& rec) const override
@@ -69,6 +79,8 @@ private:
 	Vector3 center;
 	double radius;
 	std::shared_ptr<Material> mat;
+
+	AABB bbox;
 };
 
 class HittableList : public Hittable
@@ -85,6 +97,7 @@ public:
 	void Add(std::shared_ptr<Hittable> object)
 	{
 		objects.push_back(object);
+		bbox = AABB(bbox, object->BoundingBox());
 	}
 
 	bool Hit(const Ray& r, Interval t, HitRecord& rec) const override
@@ -103,6 +116,15 @@ public:
 		}
 		return hitAnything;
 	}
+
+	AABB BoundingBox() const override
+	{
+		return bbox;
+	}
+
+private:
+
+	AABB bbox;
 };
 
 #endif

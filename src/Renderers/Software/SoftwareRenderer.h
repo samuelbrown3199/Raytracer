@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include "Material.h"
+#include "Maths/BVH.h"
 
 #include <vector>
 #include <memory>
