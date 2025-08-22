@@ -5,7 +5,10 @@
 
 void WriteImage(const std::string& filename, const std::vector<uint8_t>& pixels, int width, int height)
 {
-	stbi_write_png(filename.c_str(), width, height, 3, pixels.data(), width * 3);
+	if(stbi_write_png(filename.c_str(), width, height, 3, pixels.data(), width * 3) != 0)
+		std::clog << "\nImage written to " << filename << "\n";
+	else
+		std::clog << "\nFailed to write image to " << filename << "\n";
 }
 
 void SoftwareRenderer::SphereScene()
@@ -126,9 +129,9 @@ void SoftwareRenderer::RenderImage()
 	auto aspectRatio = 16.0f / 9.0f;
 
 	m_camera.aspectRatio = aspectRatio;
-	m_camera.m_iWidth = 400;
+	m_camera.m_iWidth = 1920;
 	m_camera.m_iSamplesPerPixel = 100;
-	m_camera.m_iMaxDepth = 50;
+	m_camera.m_iMaxDepth = 10;
 
 	m_camera.Initialize();
 	m_camera.Render(m_world);

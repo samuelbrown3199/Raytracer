@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "Renderers/Software/SoftwareRenderer.h"
+#include "Useful/Useful.h"
 
 int MainMenu()
 {
@@ -44,6 +45,8 @@ int main()
 
 			int scene = SceneSelectionMenu();
 			std::cout << "\n\n";
+
+			CreateNewDirectory("SoftwareRenders");
 
 			renderer.InitializeWorld(scene);
 			renderer.RenderImage();

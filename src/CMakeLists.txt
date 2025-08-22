@@ -2,6 +2,12 @@ set (
 	program_source
 
 	main.cpp
+	
+	Useful/UsefulFiles.h
+	Useful/UsefulFiles.cpp
+	Useful/UsefulStrings.h
+	Useful/UsefulStrings.cpp
+	Useful/Useful.h
 
 	Renderers/Software/Common.h
 

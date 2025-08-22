@@ -3,6 +3,7 @@
 #include "Common.h"
 #include "Material.h"
 #include "Maths/BVH.h"
+#include "../../Useful/Useful.h"
 
 #include <vector>
 #include <memory>
@@ -65,8 +66,8 @@ public:
 			std::clog << "\rRendering progress: " << percentComplete << "%       " << std::flush;
 		}
 
-		WriteImage("output.png", pixels, m_iWidth, m_iHeight);
-		std::clog << "\nImage rendering complete. Output saved to 'output.png'.\n";
+		std::string filename = GetWorkingDirectory() + FormatString("\\SoftwareRenders\\Render-%s.png", GetDateTimeString().c_str());
+		WriteImage(filename, pixels, m_iWidth, m_iHeight);
 	}
 
 	void Initialize()
