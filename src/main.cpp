@@ -2,7 +2,7 @@
 
 #include "Renderers/Software/SoftwareRenderer.h"
 
-int main()
+int MainMenu()
 {
 	int mode = 0;
 
@@ -14,13 +14,38 @@ int main()
 	std::cout << "Enter mode number: ";
 
 	std::cin >> mode;
+	return mode;
+}
+
+int SceneSelectionMenu()
+{
+	int scene = 0;
+	std::cout << "Select scene:\n\n";
+	std::cout << "0: Sphere scene\n";
+	std::cout << "1: Checkered Spheres\n";
+	std::cout << "2: Earth\n";
+	std::cout << "\n";
+	std::cout << "----------------------------------------------\n\n";
+	std::cout << "Enter scene number: ";
+	std::cin >> scene;
+	return scene;
+}
+
+int main()
+{
+	int mode = MainMenu();
+	std::cout << "\n\n";
 
 	switch (mode)
 	{
 	case 0:
 		{
 			SoftwareRenderer renderer;
-			renderer.InitializeWorld();
+
+			int scene = SceneSelectionMenu();
+			std::cout << "\n\n";
+
+			renderer.InitializeWorld(scene);
 			renderer.RenderImage();
 		}
 		break;

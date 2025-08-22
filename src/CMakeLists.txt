@@ -3,9 +3,12 @@ set (
 
 	main.cpp
 
+	Renderers/Software/Common.h
+
 	Renderers/Software/Material.h
 	Renderers/Software/Hittable.h
-	Renderers/Software/Common.h
+	Renderers/Software/Texture.h
+	Renderers/Software/Texture.cpp
 
 	Renderers/Software/Maths/AABB.h
 	Renderers/Software/Maths/AABB.cpp

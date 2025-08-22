@@ -51,15 +51,13 @@ public:
 				auto r = LinearToGamma(pixelColour[0]);
 				auto g = LinearToGamma(pixelColour[1]);
 				auto b = LinearToGamma(pixelColour[2]);
-				auto a = 255.999 * 1.0;
 
 				static const Interval intensity(0.000, 0.999);
 	
-				int i = (y * m_iWidth + x) * 4;
+				int i = (y * m_iWidth + x) * 3;
 				pixels[i + 0] = int(256 * intensity.Clamp(r));
 				pixels[i + 1] = int(256 * intensity.Clamp(g));
 				pixels[i + 2] = int(256 * intensity.Clamp(b));
-				pixels[i + 3] = static_cast<uint8_t>(a);
 			}
 
 			// Calculate the percentage of completion
@@ -169,9 +167,14 @@ class SoftwareRenderer
 
 
 	HittableList m_world;
+	Camera m_camera;
+
+	void SphereScene();
+	void CheckeredSpheres();
+	void EarthScene();
 
 public:
 
-	void InitializeWorld();
+	void InitializeWorld(int scene);
 	void RenderImage();
 };
