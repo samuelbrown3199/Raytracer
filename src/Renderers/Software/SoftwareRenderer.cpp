@@ -102,6 +102,27 @@ void SoftwareRenderer::EarthScene()
 	m_camera.m_defocusAngle = 0.0f;
 }
 
+void SoftwareRenderer::QuadsScene()
+{
+	auto leftRed = std::make_shared<Lambertian>(Vector3(1, .2, .2));
+	auto backGreen = std::make_shared<Lambertian>(Vector3(.2, 1, .2));
+	auto rightBlue = std::make_shared<Lambertian>(Vector3(.2, .2, 1));
+	auto upperOrange = std::make_shared<Lambertian>(Vector3(1, .5, .0));
+	auto lowerTeal = std::make_shared<Lambertian>(Vector3(.2, .8, .8));
+
+	m_world.Add(std::make_shared<Quad>(Vector3(-3, -2, 5), Vector3(0, 0, -4), Vector3(0, 4, 0), leftRed));
+	m_world.Add(std::make_shared<Quad>(Vector3(-2, -2, 0), Vector3(4, 0, 0), Vector3(0, 4, 0), backGreen));
+	m_world.Add(std::make_shared<Quad>(Vector3(3, -2, 1), Vector3(0, 0, 4), Vector3(0, 4, 0), rightBlue));
+	m_world.Add(std::make_shared<Quad>(Vector3(-2, 3, 1), Vector3(4, 0, 0), Vector3(0, 0, 4), upperOrange));
+	m_world.Add(std::make_shared<Quad>(Vector3(-2, -3, 5), Vector3(4, 0, 0), Vector3(0, 0, -4), lowerTeal));
+
+	m_camera.m_fov = 80.0f;
+	m_camera.m_lookFrom = Vector3(0, 0, 9);
+	m_camera.m_lookAt = Vector3(0, 0, 0);
+	m_camera.m_up = Vector3(0, 1, 0);
+	m_camera.m_defocusAngle = 0.0f;
+}
+
 void SoftwareRenderer::InitializeWorld(int scene)
 {
 	switch (scene)
@@ -114,6 +135,9 @@ void SoftwareRenderer::InitializeWorld(int scene)
 		break;
 	case 2:
 		EarthScene();
+		break;
+	case 3:
+		QuadsScene();
 		break;
 	default:
 		std::cout << "Unknown scene " << scene << ", defaulting to sphere scene.\n";
@@ -129,7 +153,7 @@ void SoftwareRenderer::RenderImage()
 	auto aspectRatio = 16.0f / 9.0f;
 
 	m_camera.aspectRatio = aspectRatio;
-	m_camera.m_iWidth = 1920;
+	m_camera.m_iWidth = 400;
 	m_camera.m_iSamplesPerPixel = 100;
 	m_camera.m_iMaxDepth = 10;
 

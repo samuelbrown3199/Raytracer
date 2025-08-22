@@ -102,6 +102,83 @@ private:
 
 };
 
+class Quad : public Hittable
+{
+public:
+
+	Quad(const Vector3& Q, const Vector3& u, const Vector3& v, std::shared_ptr<Material> mat)
+		: Q(Q), u(u), v(v), mat(mat)
+	{
+		auto n = Cross(u, v);
+		normal = UnitVector(n);
+		D = Dot(normal, Q);
+		w = n / Dot(n, n);
+
+		SetBoundingBox();
+	}
+
+	virtual void SetBoundingBox()
+	{
+		auto bboxDiagonal1 = AABB(Q, Q + u + v);
+		auto bboxDiagonal2 = AABB(Q + u, Q + v);
+		bbox = AABB(bboxDiagonal1, bboxDiagonal2);
+	}
+
+	AABB BoundingBox() const override
+	{
+		return bbox;
+	}
+
+	bool Hit(const Ray& r, Interval t, HitRecord& rec) const override
+	{
+		auto denom = Dot(normal, r.Direction());
+		if(std::fabs(denom) < 1e-8)
+			return false;
+
+		auto hitT = (D - Dot(normal, r.Origin())) / denom;
+		if (!t.Contains(hitT))
+			return false;
+
+		auto intersection = r.PointAtT(hitT);
+		Vector3 planarHitPoint = intersection - Q;
+		auto alpha = Dot(w, Cross(planarHitPoint, v));
+		auto beta = Dot(w, Cross(u, planarHitPoint));
+
+		if (!IsInterior(alpha, beta, rec))
+			return false;
+
+		rec.t = hitT;
+		rec.p = intersection;
+		rec.mat = mat;
+		rec.SetFaceNormal(r, normal);
+
+		return true;
+	}
+
+private:
+	Vector3 Q;
+	Vector3 u, v;
+	Vector3 w;
+	std::shared_ptr<Material> mat;
+	AABB bbox;
+	Vector3 normal;
+	double D;
+
+	virtual bool IsInterior(double alpha, double beta, HitRecord& rec) const
+	{
+		Interval unitInterval = Interval(0, 1);
+		// Given the hit point in plane coordinates, return false if it is outside the
+		// primitive, otherwise set the hit record UV coordinates and return true.
+
+		if (!unitInterval.Contains(alpha) || !unitInterval.Contains(beta))
+			return false;
+
+		rec.u = alpha;
+		rec.v = beta;
+		return true;
+	}
+};
+
 class HittableList : public Hittable
 {
 public:

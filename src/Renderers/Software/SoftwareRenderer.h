@@ -173,6 +173,7 @@ class SoftwareRenderer
 	void SphereScene();
 	void CheckeredSpheres();
 	void EarthScene();
+	void QuadsScene();
 
 public:
 
