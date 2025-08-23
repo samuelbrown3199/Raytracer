@@ -190,12 +190,19 @@ public:
 		auto ab = B - A;
 		auto ac = C - A;
 		auto n = Cross(ab, ac);
-		normal = UnitVector(n);
+		normal = -UnitVector(n);
 
-		auto rVec = Vector3(0.5 * (B - A).Length(), 0.5 * (C - A).Length(), 0.5 * (C - B).Length());
-		bbox = AABB(A - rVec, A + rVec);
-		bbox = AABB(bbox, AABB(B - rVec, B + rVec));
-		bbox = AABB(bbox, AABB(C - rVec, C + rVec));
+		Vector3 minPt(
+			std::min({ A.x(), B.x(), C.x() }),
+			std::min({ A.y(), B.y(), C.y() }),
+			std::min({ A.z(), B.z(), C.z() })
+		);
+		Vector3 maxPt(
+			std::max({ A.x(), B.x(), C.x() }),
+			std::max({ A.y(), B.y(), C.y() }),
+			std::max({ A.z(), B.z(), C.z() })
+		);
+		bbox = AABB(minPt, maxPt);
 	}
 
 	bool Hit(const Ray& r, Interval t, HitRecord& rec) const override

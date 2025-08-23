@@ -63,5 +63,9 @@ int main()
 		break;
 	}
 
+	std::cout << "\nPress ENTER to exit.";
+	std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+	std::cin.get();
+
 	return 0;
 }

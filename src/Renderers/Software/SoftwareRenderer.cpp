@@ -190,49 +190,25 @@ void SoftwareRenderer::GoldDragonAndSpheresScene()
 	auto groundMat = std::make_shared<Lambertian>(Vector3(0.4, 0.2, 0.1));
 	m_world.Add(std::make_shared<Sphere>(Vector3(0, -1000, -1), 997.5, groundMat));
 
-	for (int i = -11; i < 11; ++i)
-	{
-		for (int j = -11; j < 11; ++j)
-		{
-			auto chooseMat = RandomDouble();
-			Vector3 center(i + 0.9 * RandomDouble(), -2.5, j + 0.9 * RandomDouble());
-
-			if ((center - Vector3(4, 0.2, 0)).Length() > 0.9)
-			{
-				std::shared_ptr<Material> sphereMaterial;
-
-				if (chooseMat < 0.8) // Diffuse
-				{
-					auto albedo = Vector3::Random() * Vector3::Random();
-					sphereMaterial = std::make_shared<Lambertian>(albedo);
-					m_world.Add(std::make_shared<Sphere>(center, 0.2, sphereMaterial));
-				}
-				else if (chooseMat < 0.95) // Metal
-				{
-					auto albedo = Vector3::Random(0.5, 1);
-					auto fuzz = RandomDouble(0, 0.5);
-					sphereMaterial = std::make_shared<Metal>(albedo, fuzz);
-					m_world.Add(std::make_shared<Sphere>(center, 0.2, sphereMaterial));
-				}
-				else // Glass
-				{
-					sphereMaterial = std::make_shared<Dielectric>(1.5);
-					m_world.Add(std::make_shared<Sphere>(center, 0.2, sphereMaterial));
-				}
-			}
-		}
-	}
-
 	std::vector<Vertex> vertices;
 	LoadObjFile("Resources/Models/dragon-lowres.obj", vertices);
 
-	auto mat = std::make_shared<Metal>(Vector3(0.94, 0.72, 0.14), 0.2);
+	auto mat = std::make_shared<Lambertian>(Vector3(1.0, 1.0, 1.0));
 	TriangleMesh dragon = TriangleMesh(vertices, mat);
 	m_world.Add(std::make_shared<BVHNode>(dragon));
 
+	auto material1 = std::make_shared<Dielectric>(1.5);
+	m_world.Add(std::make_shared<Sphere>(Vector3(0, 1, 4), 1.0, material1));
+
+	auto material2 = std::make_shared<Lambertian>(Vector3(0.4, 0.2, 0.1));
+	m_world.Add(std::make_shared<Sphere>(Vector3(-4, 1, 4), 1.0, material2));
+
+	auto material3 = std::make_shared<Metal>(Vector3(0.7, 0.6, 0.5), 0.0);
+	m_world.Add(std::make_shared<Sphere>(Vector3(4, 1, 4), 1.0, material3));
+
 	m_camera.m_background = Vector3(0.70, 0.80, 1.00);
 	m_camera.m_fov = 90.0f;
-	m_camera.m_lookFrom = Vector3(-1, 2, -5);
+	m_camera.m_lookFrom = Vector3(-1, 0, 2);
 	m_camera.m_lookAt = Vector3(0, 0, 0);
 	m_camera.m_up = Vector3(0, 1, 0);
 	m_camera.m_defocusAngle = 0;
@@ -282,7 +258,7 @@ void SoftwareRenderer::RenderImage()
 	//auto aspectRatio = 1.0f;
 
 	m_camera.aspectRatio = aspectRatio;
-	m_camera.m_iWidth = 1920;
+	m_camera.m_iWidth = 300;
 	m_camera.m_iSamplesPerPixel = 500;
 	m_camera.m_iMaxDepth = 50;
 

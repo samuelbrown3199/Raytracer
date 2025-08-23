@@ -33,6 +33,7 @@ public:
 		float percentComplete = 0.0f;
 		std::vector<uint8_t> pixels(m_iWidth * m_iHeight * 4);
 
+		int lastPercent = -1;
 		int totalPixelsProcessed = 0;
 		int totalPixels = m_iWidth * m_iHeight;
 
@@ -67,7 +68,11 @@ public:
 
 				totalPixelsProcessed++;
 				percentComplete = (static_cast<float>(totalPixelsProcessed) / totalPixels) * 100.0f;
-				std::clog << "\rRendering progress: " << percentComplete << "%       " << std::flush;
+				if (floor(percentComplete) != lastPercent)
+				{
+					std::clog << "\rRendering progress: " << floor(percentComplete) << "%       " << std::flush;
+					lastPercent = floor(percentComplete);
+				}
 			}
 		}
 
