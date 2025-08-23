@@ -12,6 +12,8 @@ set (
 	Renderers/ModelLoader.h
 	Renderers/ModelLoader.cpp
 
+	#CPU Renderer
+
 	Renderers/Software/Common.h
 
 	Renderers/Software/Material.h
@@ -29,6 +31,23 @@ set (
 
 	Renderers/Software/SoftwareRenderer.h
 	Renderers/Software/SoftwareRenderer.cpp
+	
+	#GPU Renderer
+
+	Renderers/Hardware/Vulkan/VulkanDescriptors.h
+	Renderers/Hardware/Vulkan/VulkanDescriptors.cpp
+	Renderers/Hardware/Vulkan/VulkanImages.h
+	Renderers/Hardware/Vulkan/VulkanImages.cpp
+	Renderers/Hardware/Vulkan/VulkanInitialisers.h
+	Renderers/Hardware/Vulkan/VulkanInitialisers.cpp
+	Renderers/Hardware/Vulkan/VulkanPipelines.h
+	Renderers/Hardware/Vulkan/VulkanPipelines.cpp
+	Renderers/Hardware/Vulkan/VulkanTypes.h
+
+	Renderers/Hardware/Window.h
+	Renderers/Hardware/Window.cpp
+	Renderers/Hardware/HardwareRenderer.h
+	Renderers/Hardware/HardwareRenderer.cpp
 )
 
 add_executable(Raytracer
@@ -41,7 +60,7 @@ foreach(source IN LISTS program_source)
     source_group("${source_path_msvc}" FILES "${source}")
 endforeach()
 
-#target_link_libraries(Raytracer SDL3-static vulkan-1 vk-bootstrap)
+target_link_libraries(Raytracer SDL3-static vulkan-1 vk-bootstrap)
 set_target_properties(Raytracer PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<1:${CMAKE_SOURCE_DIR}/Image>)
 set_property(TARGET Raytracer PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/Image")
 target_compile_features(Raytracer PRIVATE cxx_std_20)

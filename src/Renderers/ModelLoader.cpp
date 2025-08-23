@@ -25,21 +25,21 @@ void LoadObjFile(const std::string& filePath, std::vector<Vertex>& vertices)
         {
             Vertex vertex{};
 
-            vertex.vertexPos[0] = attrib.vertices[3 * index.vertex_index + 0];
-            vertex.vertexPos[1] = attrib.vertices[3 * index.vertex_index + 1];
-            vertex.vertexPos[1] = attrib.vertices[3 * index.vertex_index + 2];
+            vertex.m_position[0] = attrib.vertices[3 * index.vertex_index + 0];
+            vertex.m_position[1] = attrib.vertices[3 * index.vertex_index + 1];
+            vertex.m_position[1] = attrib.vertices[3 * index.vertex_index + 2];
 
             if (attrib.texcoords.size() != 0)
             {
-                vertex.texCoords[0] = attrib.texcoords[2 * index.texcoord_index + 0];
-                vertex.texCoords[1] = 1.0f - attrib.texcoords[2 * index.texcoord_index + 1];
+                vertex.m_uvX = attrib.texcoords[2 * index.texcoord_index + 0];
+                vertex.m_uvY = 1.0f - attrib.texcoords[2 * index.texcoord_index + 1];
             }
 
             if (attrib.normals.size() != 0)
             {
-                vertex.normals[0] = attrib.normals[3 * index.normal_index + 0];
-                vertex.normals[1] = attrib.normals[3 * index.normal_index + 1];
-                vertex.normals[2] = attrib.normals[3 * index.normal_index + 2];
+                vertex.m_normal[0] = attrib.normals[3 * index.normal_index + 0];
+                vertex.m_normal[1] = attrib.normals[3 * index.normal_index + 1];
+                vertex.m_normal[2] = attrib.normals[3 * index.normal_index + 2];
             }
 
             vertices.push_back(vertex);

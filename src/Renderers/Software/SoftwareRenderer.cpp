@@ -275,8 +275,8 @@ void SoftwareRenderer::RenderImage()
 	//auto aspectRatio = 1.0f;
 
 	m_camera.aspectRatio = aspectRatio;
-	m_camera.m_iWidth = 300;
-	m_camera.m_iSamplesPerPixel = 500;
+	m_camera.m_iWidth = 400;
+	m_camera.m_iSamplesPerPixel = 100;
 	m_camera.m_iMaxDepth = 50;
 
 	m_camera.Initialize();

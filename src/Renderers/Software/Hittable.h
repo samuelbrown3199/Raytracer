@@ -187,22 +187,22 @@ public:
 	Triangle(const Vertex& vertA, const Vertex& vertB, const Vertex& vertC, std::shared_ptr<Material> mat)
 		: mat(mat)
 	{
-		Vector3 aPos = Vector3(vertA.vertexPos[0], vertA.vertexPos[1], vertA.vertexPos[2]);
-		Vector3 bPos = Vector3(vertB.vertexPos[0], vertB.vertexPos[1], vertB.vertexPos[2]);
-		Vector3 cPos = Vector3(vertC.vertexPos[0], vertC.vertexPos[1], vertC.vertexPos[2]);
+		Vector3 aPos = Vector3(vertA.m_position[0], vertA.m_position[1], vertA.m_position[2]);
+		Vector3 bPos = Vector3(vertB.m_position[0], vertB.m_position[1], vertB.m_position[2]);
+		Vector3 cPos = Vector3(vertC.m_position[0], vertC.m_position[1], vertC.m_position[2]);
 
 		A = aPos;
 		B = bPos;
 		C = cPos;
 
-		uvA[0] = vertA.texCoords[0];
-		uvA[1] = vertA.texCoords[1];
+		uvA[0] = vertA.m_uvX;
+		uvA[1] = vertA.m_uvY;
 
-		uvB[0] = vertB.texCoords[0];
-		uvB[1] = vertB.texCoords[1];
+		uvB[0] = vertB.m_uvX;
+		uvB[1] = vertB.m_uvY;
 
-		uvC[0] = vertC.texCoords[0];
-		uvC[1] = vertC.texCoords[1];
+		uvC[0] = vertC.m_uvX;
+		uvC[1] = vertC.m_uvY;
 
 		auto ab = B - A;
 		auto ac = C - A;

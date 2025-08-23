@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "Renderers/Software/SoftwareRenderer.h"
+#include "Renderers/Hardware/HardwareRenderer.h"
 #include "Useful/Useful.h"
 
 int MainMenu()
@@ -9,6 +10,7 @@ int MainMenu()
 
 	std::cout << "Select raytracer mode:\n\n";
 	std::cout << "0: Software renderer (output one image file)\n";
+	std::cout << "1: Hardware renderer (real-time rendering with Vulkan)\n";
 	std::cout << "\n";
 
 	std::cout << "----------------------------------------------\n\n";
@@ -60,6 +62,14 @@ int main()
 			std::cout << "\nPress ENTER to exit.";
 			std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 			std::cin.get();
+		}
+		break;
+	case 1:
+		{
+			HardwareRenderer renderer;
+			renderer.InitializeRenderer();
+
+			std::cout << "Goodbye! :D\n";
 		}
 		break;
 	default:
