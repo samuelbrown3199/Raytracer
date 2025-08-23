@@ -171,20 +171,6 @@ void SoftwareRenderer::CornellBoxScene()
 	m_camera.m_defocusAngle = 0;
 }
 
-void SoftwareRenderer::TriangleMeshScene()
-{
-	auto red = std::make_shared<Lambertian>(Vector3(.65, .05, .05));
-
-	m_world.Add(std::make_shared<Triangle>(Vector3(-0.5, -0.5, 0), Vector3(1.5, -0.5, 0), Vector3(1.0, 1.5, 0), red));
-
-	m_camera.m_background = Vector3(0.70, 0.80, 1.00);
-	m_camera.m_fov = 80.0f;
-	m_camera.m_lookFrom = Vector3(0, 0, 9);
-	m_camera.m_lookAt = Vector3(0, 0, 0);
-	m_camera.m_up = Vector3(0, 1, 0);
-	m_camera.m_defocusAngle = 0;
-}
-
 void SoftwareRenderer::GoldDragonAndSpheresScene()
 {
 	auto groundMat = std::make_shared<Lambertian>(Vector3(0.4, 0.2, 0.1));
@@ -215,6 +201,37 @@ void SoftwareRenderer::GoldDragonAndSpheresScene()
 	m_camera.m_focusDistance = 30.0f;
 }
 
+void SoftwareRenderer::CottageScene()
+{
+	auto groundMat = std::make_shared<Lambertian>(Vector3(0.4, 0.2, 0.1));
+	m_world.Add(std::make_shared<Sphere>(Vector3(0, -1000, -1), 997.5, groundMat));
+
+	std::vector<Vertex> vertices;
+	LoadObjFile("Resources/Models/cottage_obj.obj", vertices);
+
+	auto cottageTexture = std::make_shared<ImageTexture>("Resources/Textures/cottage_diffuse.jpg");
+	auto cottageMat = std::make_shared<Lambertian>(cottageTexture);
+	TriangleMesh cottage = TriangleMesh(vertices, cottageMat);
+	m_world.Add(std::make_shared<BVHNode>(cottage));
+
+	auto material1 = std::make_shared<Dielectric>(1.5);
+	m_world.Add(std::make_shared<Sphere>(Vector3(0, 1, 4), 1.0, material1));
+
+	auto material2 = std::make_shared<Lambertian>(Vector3(0.4, 0.2, 0.1));
+	m_world.Add(std::make_shared<Sphere>(Vector3(-4, 1, 4), 1.0, material2));
+
+	auto material3 = std::make_shared<Metal>(Vector3(0.7, 0.6, 0.5), 0.0);
+	m_world.Add(std::make_shared<Sphere>(Vector3(4, 1, 4), 1.0, material3));
+
+	m_camera.m_background = Vector3(0.70, 0.80, 1.00);
+	m_camera.m_fov = 90.0f;
+	m_camera.m_lookFrom = Vector3(-1, 0, 30);
+	m_camera.m_lookAt = Vector3(0, 0, 0);
+	m_camera.m_up = Vector3(0, 1, 0);
+	m_camera.m_defocusAngle = 0;
+	m_camera.m_focusDistance = 250.0f;
+}
+
 void SoftwareRenderer::InitializeWorld(int scene)
 {
 	switch (scene)
@@ -238,10 +255,10 @@ void SoftwareRenderer::InitializeWorld(int scene)
 		CornellBoxScene();
 		break;
 	case 6:
-		TriangleMeshScene();
+		GoldDragonAndSpheresScene();
 		break;
 	case 7:
-		GoldDragonAndSpheresScene();
+		CottageScene();
 		break;
 	default:
 		std::cout << "Unknown scene " << scene << ", defaulting to sphere scene.\n";

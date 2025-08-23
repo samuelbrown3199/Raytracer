@@ -185,8 +185,8 @@ class SoftwareRenderer
 	void QuadsScene();
 	void SimpleLightScene();
 	void CornellBoxScene();
-	void TriangleMeshScene();
 	void GoldDragonAndSpheresScene();
+	void CottageScene();
 
 public:
 

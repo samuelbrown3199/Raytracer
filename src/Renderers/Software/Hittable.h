@@ -184,23 +184,40 @@ class Triangle : public Hittable
 {
 public:
 
-	Triangle(const Vector3& A, const Vector3& B, const Vector3& C, std::shared_ptr<Material> mat)
-		: A(A), B(B), C(C), mat(mat)
+	Triangle(const Vertex& vertA, const Vertex& vertB, const Vertex& vertC, std::shared_ptr<Material> mat)
+		: mat(mat)
 	{
+		Vector3 aPos = Vector3(vertA.vertexPos[0], vertA.vertexPos[1], vertA.vertexPos[2]);
+		Vector3 bPos = Vector3(vertB.vertexPos[0], vertB.vertexPos[1], vertB.vertexPos[2]);
+		Vector3 cPos = Vector3(vertC.vertexPos[0], vertC.vertexPos[1], vertC.vertexPos[2]);
+
+		A = aPos;
+		B = bPos;
+		C = cPos;
+
+		uvA[0] = vertA.texCoords[0];
+		uvA[1] = vertA.texCoords[1];
+
+		uvB[0] = vertB.texCoords[0];
+		uvB[1] = vertB.texCoords[1];
+
+		uvC[0] = vertC.texCoords[0];
+		uvC[1] = vertC.texCoords[1];
+
 		auto ab = B - A;
 		auto ac = C - A;
 		auto n = Cross(ab, ac);
 		normal = -UnitVector(n);
 
 		Vector3 minPt(
-			std::min({ A.x(), B.x(), C.x() }),
-			std::min({ A.y(), B.y(), C.y() }),
-			std::min({ A.z(), B.z(), C.z() })
+			std::min({ aPos.x(), bPos.x(), cPos.x() }),
+			std::min({ aPos.y(), bPos.y(), cPos.y() }),
+			std::min({ aPos.z(), bPos.z(), cPos.z() })
 		);
 		Vector3 maxPt(
-			std::max({ A.x(), B.x(), C.x() }),
-			std::max({ A.y(), B.y(), C.y() }),
-			std::max({ A.z(), B.z(), C.z() })
+			std::max({ aPos.x(), bPos.x(), cPos.x() }),
+			std::max({ aPos.y(), bPos.y(), cPos.y() }),
+			std::max({ aPos.z(), bPos.z(), cPos.z() })
 		);
 		bbox = AABB(minPt, maxPt);
 	}
@@ -233,6 +250,8 @@ public:
 			rec.p = r.PointAtT(hitT);
 			rec.mat = mat;
 			rec.SetFaceNormal(r, normal);
+
+			GetUVCoordinates(rec.p, rec.u, rec.v);
 		}
 		else
 			return false;
@@ -247,8 +266,30 @@ private:
 
 	Vector3 A, B, C;
 	Vector3 normal;
+	float uvA[2];
+	float uvB[2];
+	float uvC[2];
+
 	AABB bbox;
 	std::shared_ptr<Material> mat;
+
+	void GetUVCoordinates(const Vector3& p, double& u, double& v) const
+	{
+		// Barycentric coordinates
+		Vector3 v0 = B - A;
+		Vector3 v1 = C - A;
+		Vector3 v2 = p - A;
+		auto d00 = Dot(v0, v0);
+		auto d01 = Dot(v0, v1);
+		auto d11 = Dot(v1, v1);
+		auto d20 = Dot(v2, v0);
+		auto d21 = Dot(v2, v1);
+		auto denom = d00 * d11 - d01 * d01;
+		auto vCoord = (d11 * d20 - d01 * d21) / denom;
+		auto wCoord = (d00 * d21 - d01 * d20) / denom;
+		u = vCoord;
+		v = wCoord;
+	}
 };
 
 class HittableList : public Hittable
@@ -305,10 +346,7 @@ public:
 			throw std::exception("TriangleMesh: vertex count not multiple of 3");
 		for (size_t i = 0; i < vertices.size(); i += 3)
 		{
-			auto v0 = Vector3(vertices[i].vertexPos[0], vertices[i].vertexPos[1], vertices[i].vertexPos[2]);
-			auto v1 = Vector3(vertices[i + 1].vertexPos[0], vertices[i + 1].vertexPos[1], vertices[i + 1].vertexPos[2]);
-			auto v2 = Vector3(vertices[i + 2].vertexPos[0], vertices[i + 2].vertexPos[1], vertices[i + 2].vertexPos[2]);
-			Add(std::make_shared<Triangle>(v0, v1, v2, mat));
+			Add(std::make_shared<Triangle>(vertices[i], vertices[i + 1], vertices[i + 2], mat));
 		}
 	}
 };

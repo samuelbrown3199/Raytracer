@@ -8,7 +8,8 @@ int MainMenu()
 	int mode = 0;
 
 	std::cout << "Select raytracer mode:\n\n";
-	std::cout << "0: Software renderer (output one image file)\n\n";
+	std::cout << "0: Software renderer (output one image file)\n";
+	std::cout << "\n";
 
 	std::cout << "----------------------------------------------\n\n";
 
@@ -28,8 +29,8 @@ int SceneSelectionMenu()
 	std::cout << "3: Quads\n";
 	std::cout << "4: Simple Light\n";
 	std::cout << "5: Cornell Box\n";
-	std::cout << "6: Triangle Mesh\n";
-	std::cout << "7: Gold Dragon and Spheres\n";
+	std::cout << "6: Gold Dragon and Spheres\n";
+	std::cout << "7: Cottage Scene\n";
 	std::cout << "\n";
 	std::cout << "----------------------------------------------\n\n";
 	std::cout << "Enter scene number: ";
@@ -55,6 +56,10 @@ int main()
 
 			renderer.InitializeWorld(scene);
 			renderer.RenderImage();
+
+			std::cout << "\nPress ENTER to exit.";
+			std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+			std::cin.get();
 		}
 		break;
 	default:
@@ -62,10 +67,6 @@ int main()
 		std::cout << errorMessage << std::endl;
 		break;
 	}
-
-	std::cout << "\nPress ENTER to exit.";
-	std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-	std::cin.get();
 
 	return 0;
 }
