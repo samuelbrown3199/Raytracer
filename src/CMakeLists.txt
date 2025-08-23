@@ -9,6 +9,9 @@ set (
 	Useful/UsefulStrings.cpp
 	Useful/Useful.h
 
+	Renderers/ModelLoader.h
+	Renderers/ModelLoader.cpp
+
 	Renderers/Software/Common.h
 
 	Renderers/Software/Material.h

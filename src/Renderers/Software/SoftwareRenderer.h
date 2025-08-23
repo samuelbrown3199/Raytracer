@@ -32,6 +32,10 @@ public:
 	{
 		float percentComplete = 0.0f;
 		std::vector<uint8_t> pixels(m_iWidth * m_iHeight * 4);
+
+		int totalPixelsProcessed = 0;
+		int totalPixels = m_iWidth * m_iHeight;
+
 		for (int y = 0; y < m_iHeight; ++y)
 		{
 			for (int x = 0; x < m_iWidth; x++)
@@ -60,11 +64,11 @@ public:
 				pixels[i + 0] = int(256 * intensity.Clamp(r));
 				pixels[i + 1] = int(256 * intensity.Clamp(g));
 				pixels[i + 2] = int(256 * intensity.Clamp(b));
-			}
 
-			// Calculate the percentage of completion
-			percentComplete = static_cast<float>(y + 1) / m_iHeight * 100.0f;
-			std::clog << "\rRendering progress: " << percentComplete << "%       " << std::flush;
+				totalPixelsProcessed++;
+				percentComplete = (static_cast<float>(totalPixelsProcessed) / totalPixels) * 100.0f;
+				std::clog << "\rRendering progress: " << percentComplete << "%       " << std::flush;
+			}
 		}
 
 		std::string filename = GetWorkingDirectory() + FormatString("\\SoftwareRenders\\Render-%s.png", GetDateTimeString().c_str());
@@ -176,6 +180,8 @@ class SoftwareRenderer
 	void QuadsScene();
 	void SimpleLightScene();
 	void CornellBoxScene();
+	void TriangleMeshScene();
+	void GoldDragonAndSpheresScene();
 
 public:
 

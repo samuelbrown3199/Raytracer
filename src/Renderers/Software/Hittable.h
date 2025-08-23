@@ -2,6 +2,7 @@
 #define HITTABLE_H
 
 #include "Maths/AABB.h"
+#include "../ModelLoader.h"
 
 class Material;
 
@@ -179,6 +180,70 @@ private:
 	}
 };
 
+class Triangle : public Hittable
+{
+public:
+
+	Triangle(const Vector3& A, const Vector3& B, const Vector3& C, std::shared_ptr<Material> mat)
+		: A(A), B(B), C(C), mat(mat)
+	{
+		auto ab = B - A;
+		auto ac = C - A;
+		auto n = Cross(ab, ac);
+		normal = UnitVector(n);
+
+		auto rVec = Vector3(0.5 * (B - A).Length(), 0.5 * (C - A).Length(), 0.5 * (C - B).Length());
+		bbox = AABB(A - rVec, A + rVec);
+		bbox = AABB(bbox, AABB(B - rVec, B + rVec));
+		bbox = AABB(bbox, AABB(C - rVec, C + rVec));
+	}
+
+	bool Hit(const Ray& r, Interval t, HitRecord& rec) const override
+	{
+		Vector3 edge1 = B - A;
+		Vector3 edge2 = C - A;
+		Vector3 rayCross = Cross(r.Direction(), edge2);
+		float det = Dot(edge1, rayCross);
+		if (std::fabs(det) < 1e-8)
+			return false;
+
+		float invDet = 1.0f / det;
+		Vector3 s = r.Origin() - A;
+		float u = invDet * Dot(s, rayCross);
+
+		if((u < 0 && abs(u) > 1e-8) || (u > 1 && abs(u - 1) > 1e-8))
+			return false;
+
+		Vector3 sCross = Cross(s, edge1);
+		float v = invDet * Dot(r.Direction(), sCross);
+		if ((v < 0 && abs(v) > 1e-8) || (u + v > 1 && abs(u + v - 1) > 1e-8))
+			return false;
+
+		float hitT = invDet * Dot(edge2, sCross);
+		if (hitT > 1e-8)
+		{
+			rec.t = hitT;
+			rec.p = r.PointAtT(hitT);
+			rec.mat = mat;
+			rec.SetFaceNormal(r, normal);
+		}
+		else
+			return false;
+	}
+
+	AABB BoundingBox() const override
+	{
+		return bbox;
+	}
+
+private:
+
+	Vector3 A, B, C;
+	Vector3 normal;
+	AABB bbox;
+	std::shared_ptr<Material> mat;
+};
+
 class HittableList : public Hittable
 {
 public:
@@ -221,6 +286,24 @@ public:
 private:
 
 	AABB bbox;
+};
+
+class TriangleMesh : public HittableList
+{
+public:
+
+	TriangleMesh(const std::vector<Vertex>& vertices, std::shared_ptr<Material> mat)
+	{
+		if (vertices.size() % 3 != 0)
+			throw std::exception("TriangleMesh: vertex count not multiple of 3");
+		for (size_t i = 0; i < vertices.size(); i += 3)
+		{
+			auto v0 = Vector3(vertices[i].vertexPos[0], vertices[i].vertexPos[1], vertices[i].vertexPos[2]);
+			auto v1 = Vector3(vertices[i + 1].vertexPos[0], vertices[i + 1].vertexPos[1], vertices[i + 1].vertexPos[2]);
+			auto v2 = Vector3(vertices[i + 2].vertexPos[0], vertices[i + 2].vertexPos[1], vertices[i + 2].vertexPos[2]);
+			Add(std::make_shared<Triangle>(v0, v1, v2, mat));
+		}
+	}
 };
 
 #endif

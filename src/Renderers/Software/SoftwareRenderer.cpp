@@ -171,6 +171,74 @@ void SoftwareRenderer::CornellBoxScene()
 	m_camera.m_defocusAngle = 0;
 }
 
+void SoftwareRenderer::TriangleMeshScene()
+{
+	auto red = std::make_shared<Lambertian>(Vector3(.65, .05, .05));
+
+	m_world.Add(std::make_shared<Triangle>(Vector3(-0.5, -0.5, 0), Vector3(1.5, -0.5, 0), Vector3(1.0, 1.5, 0), red));
+
+	m_camera.m_background = Vector3(0.70, 0.80, 1.00);
+	m_camera.m_fov = 80.0f;
+	m_camera.m_lookFrom = Vector3(0, 0, 9);
+	m_camera.m_lookAt = Vector3(0, 0, 0);
+	m_camera.m_up = Vector3(0, 1, 0);
+	m_camera.m_defocusAngle = 0;
+}
+
+void SoftwareRenderer::GoldDragonAndSpheresScene()
+{
+	auto groundMat = std::make_shared<Lambertian>(Vector3(0.4, 0.2, 0.1));
+	m_world.Add(std::make_shared<Sphere>(Vector3(0, -1000, -1), 997.5, groundMat));
+
+	for (int i = -11; i < 11; ++i)
+	{
+		for (int j = -11; j < 11; ++j)
+		{
+			auto chooseMat = RandomDouble();
+			Vector3 center(i + 0.9 * RandomDouble(), -2.5, j + 0.9 * RandomDouble());
+
+			if ((center - Vector3(4, 0.2, 0)).Length() > 0.9)
+			{
+				std::shared_ptr<Material> sphereMaterial;
+
+				if (chooseMat < 0.8) // Diffuse
+				{
+					auto albedo = Vector3::Random() * Vector3::Random();
+					sphereMaterial = std::make_shared<Lambertian>(albedo);
+					m_world.Add(std::make_shared<Sphere>(center, 0.2, sphereMaterial));
+				}
+				else if (chooseMat < 0.95) // Metal
+				{
+					auto albedo = Vector3::Random(0.5, 1);
+					auto fuzz = RandomDouble(0, 0.5);
+					sphereMaterial = std::make_shared<Metal>(albedo, fuzz);
+					m_world.Add(std::make_shared<Sphere>(center, 0.2, sphereMaterial));
+				}
+				else // Glass
+				{
+					sphereMaterial = std::make_shared<Dielectric>(1.5);
+					m_world.Add(std::make_shared<Sphere>(center, 0.2, sphereMaterial));
+				}
+			}
+		}
+	}
+
+	std::vector<Vertex> vertices;
+	LoadObjFile("Resources/Models/dragon-lowres.obj", vertices);
+
+	auto mat = std::make_shared<Metal>(Vector3(0.94, 0.72, 0.14), 0.2);
+	TriangleMesh dragon = TriangleMesh(vertices, mat);
+	m_world.Add(std::make_shared<BVHNode>(dragon));
+
+	m_camera.m_background = Vector3(0.70, 0.80, 1.00);
+	m_camera.m_fov = 90.0f;
+	m_camera.m_lookFrom = Vector3(-1, 2, -5);
+	m_camera.m_lookAt = Vector3(0, 0, 0);
+	m_camera.m_up = Vector3(0, 1, 0);
+	m_camera.m_defocusAngle = 0;
+	m_camera.m_focusDistance = 30.0f;
+}
+
 void SoftwareRenderer::InitializeWorld(int scene)
 {
 	switch (scene)
@@ -193,6 +261,12 @@ void SoftwareRenderer::InitializeWorld(int scene)
 	case 5:
 		CornellBoxScene();
 		break;
+	case 6:
+		TriangleMeshScene();
+		break;
+	case 7:
+		GoldDragonAndSpheresScene();
+		break;
 	default:
 		std::cout << "Unknown scene " << scene << ", defaulting to sphere scene.\n";
 		SphereScene();
@@ -204,12 +278,12 @@ void SoftwareRenderer::RenderImage()
 {
 	auto startTime = std::chrono::high_resolution_clock::now();
 	
-	//auto aspectRatio = 16.0f / 9.0f;
-	auto aspectRatio = 1.0f;
+	auto aspectRatio = 16.0f / 9.0f;
+	//auto aspectRatio = 1.0f;
 
 	m_camera.aspectRatio = aspectRatio;
-	m_camera.m_iWidth = 600;
-	m_camera.m_iSamplesPerPixel = 200;
+	m_camera.m_iWidth = 1920;
+	m_camera.m_iSamplesPerPixel = 500;
 	m_camera.m_iMaxDepth = 50;
 
 	m_camera.Initialize();

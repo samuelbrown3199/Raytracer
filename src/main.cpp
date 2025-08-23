@@ -28,6 +28,8 @@ int SceneSelectionMenu()
 	std::cout << "3: Quads\n";
 	std::cout << "4: Simple Light\n";
 	std::cout << "5: Cornell Box\n";
+	std::cout << "6: Triangle Mesh\n";
+	std::cout << "7: Gold Dragon and Spheres\n";
 	std::cout << "\n";
 	std::cout << "----------------------------------------------\n\n";
 	std::cout << "Enter scene number: ";
