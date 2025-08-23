@@ -18,8 +18,9 @@ public:
 	int m_iWidth;
 	int m_iSamplesPerPixel = 10; // Number of samples per pixel
 	int m_iMaxDepth = 10; //Maximum number of ray bounces
-	double m_fov = 90.0f;
+	Vector3 m_background;
 
+	double m_fov = 90.0f;
 	Vector3 m_lookFrom = Vector3(0.0, 0.0, 0.0);
 	Vector3 m_lookAt = Vector3(0.0, 0.0, -1.0);
 	Vector3 m_up = Vector3(0.0, 1.0, 0.0);
@@ -121,20 +122,19 @@ private:
 			return Vector3(0, 0, 0);
 
 		HitRecord rec;
-		if (world.Hit(r, Interval(0.001, infinity), rec))
-		{
-			Ray scattered;
-			Vector3 attenuation;
-			if(rec.mat->Scatter(r, rec, attenuation, scattered))
-				return attenuation * RayColour(scattered, depth - 1, world);
 
-			return Vector3(0, 0, 0); // No scattering, return black
-		}
+		if(!world.Hit(r, Interval(0.001, infinity), rec))
+			return m_background;
 
-		// Simple gradient background
-		auto unitDirection = UnitVector(r.Direction());
-		auto a = 0.5 * (unitDirection.y() + 1.0);
-		return (1.0 - a) * Colour3(1.0, 1.0, 1.0) + a * Colour3(0.5, 0.7, 1.0);
+		Ray scattered;
+		Vector3 attenuation;
+		Vector3 colourFromEmission = rec.mat->Emitted(rec.u, rec.v, rec.p);
+
+		if (!rec.mat->Scatter(r, rec, attenuation, scattered))
+			return colourFromEmission;
+
+		Vector3 colourFromScatter = attenuation * RayColour(scattered, depth - 1, world);
+		return colourFromEmission + colourFromScatter;
 	}
 
 	Ray GetRay(int x, int y) const
@@ -174,6 +174,8 @@ class SoftwareRenderer
 	void CheckeredSpheres();
 	void EarthScene();
 	void QuadsScene();
+	void SimpleLightScene();
+	void CornellBoxScene();
 
 public:
 

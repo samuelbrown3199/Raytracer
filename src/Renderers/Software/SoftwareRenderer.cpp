@@ -61,6 +61,7 @@ void SoftwareRenderer::SphereScene()
 
 	m_world = HittableList(std::make_shared<BVHNode>(m_world));
 
+	m_camera.m_background = Vector3(0.70, 0.80, 1.00);
 	m_camera.m_fov = 20.0f;
 	m_camera.m_lookFrom = Vector3(13, 2, 3);
 	m_camera.m_lookAt = Vector3(0, 0, 0);
@@ -77,6 +78,7 @@ void SoftwareRenderer::CheckeredSpheres()
 	m_world.Add(std::make_shared<Sphere>(Vector3(0, -10, 0), 10, make_shared<Lambertian>(checker)));
 	m_world.Add(std::make_shared<Sphere>(Vector3(0, 10, 0), 10, make_shared<Lambertian>(checker)));
 
+	m_camera.m_background = Vector3(0.70, 0.80, 1.00);
 	m_camera.m_fov = 20.0f;
 	m_camera.m_lookFrom = Vector3(13, 2, 3);
 	m_camera.m_lookAt = Vector3(0, 0, 0);
@@ -95,6 +97,7 @@ void SoftwareRenderer::EarthScene()
 
 	m_world.Add(globe);
 
+	m_camera.m_background = Vector3(0.70, 0.80, 1.00);
 	m_camera.m_fov = 20.0f;
 	m_camera.m_lookFrom = Vector3(0, 0, 12);
 	m_camera.m_lookAt = Vector3(0, 0, 0);
@@ -104,11 +107,11 @@ void SoftwareRenderer::EarthScene()
 
 void SoftwareRenderer::QuadsScene()
 {
-	auto leftRed = std::make_shared<Lambertian>(Vector3(1, .2, .2));
-	auto backGreen = std::make_shared<Lambertian>(Vector3(.2, 1, .2));
-	auto rightBlue = std::make_shared<Lambertian>(Vector3(.2, .2, 1));
-	auto upperOrange = std::make_shared<Lambertian>(Vector3(1, .5, .0));
-	auto lowerTeal = std::make_shared<Lambertian>(Vector3(.2, .8, .8));
+	auto leftRed = std::make_shared<Lambertian>(Vector3(1.0, 0.2, 0.2));
+	auto backGreen = std::make_shared<Lambertian>(Vector3(0.2, 1.0, 0.2));
+	auto rightBlue = std::make_shared<Lambertian>(Vector3(0.2, 0.2, 1.0));
+	auto upperOrange = std::make_shared<Lambertian>(Vector3(1.0, 0.5, 0.0));
+	auto lowerTeal = std::make_shared<Lambertian>(Vector3(0.2, 0.8, 0.8));
 
 	m_world.Add(std::make_shared<Quad>(Vector3(-3, -2, 5), Vector3(0, 0, -4), Vector3(0, 4, 0), leftRed));
 	m_world.Add(std::make_shared<Quad>(Vector3(-2, -2, 0), Vector3(4, 0, 0), Vector3(0, 4, 0), backGreen));
@@ -116,11 +119,56 @@ void SoftwareRenderer::QuadsScene()
 	m_world.Add(std::make_shared<Quad>(Vector3(-2, 3, 1), Vector3(4, 0, 0), Vector3(0, 0, 4), upperOrange));
 	m_world.Add(std::make_shared<Quad>(Vector3(-2, -3, 5), Vector3(4, 0, 0), Vector3(0, 0, -4), lowerTeal));
 
+	m_camera.m_background = Vector3(0.70, 0.80, 1.00);
 	m_camera.m_fov = 80.0f;
 	m_camera.m_lookFrom = Vector3(0, 0, 9);
 	m_camera.m_lookAt = Vector3(0, 0, 0);
 	m_camera.m_up = Vector3(0, 1, 0);
 	m_camera.m_defocusAngle = 0.0f;
+}
+
+void SoftwareRenderer::SimpleLightScene()
+{
+	auto sphereMat = std::make_shared<Lambertian>(Vector3(0.1, 0.2, 0.5));
+	auto groundMat = std::make_shared<Lambertian>(Vector3(0.4, 0.2, 0.1));
+
+	m_world.Add(std::make_shared<Sphere>(Vector3(0, -1000, -1), 1000, groundMat));
+	m_world.Add(std::make_shared<Sphere>(Vector3(0, 2, 0), 2, sphereMat));
+
+	auto difflight = std::make_shared<DiffuseLight>(Vector3(4, 4, 4));
+	m_world.Add(std::make_shared<Sphere>(Vector3(0, 7, 0), 2, difflight));
+	m_world.Add(std::make_shared<Quad>(Vector3(3, 1, -2), Vector3(2, 0, 0), Vector3(0, 2, 0), difflight));
+
+	m_camera.m_background = Vector3(0.0, 0.0, 0.0);
+	m_camera.m_fov = 20.0f;
+	m_camera.m_lookFrom = Vector3(26, 3, 6);
+	m_camera.m_lookAt = Vector3(0, 2, 0);
+	m_camera.m_up = Vector3(0, 1, 0);
+	m_camera.m_defocusAngle = 0.0f;
+}
+
+void SoftwareRenderer::CornellBoxScene()
+{
+	auto red = std::make_shared<Lambertian>(Vector3(.65, .05, .05));
+	auto white = std::make_shared<Lambertian>(Vector3(.73, .73, .73));
+	auto green = std::make_shared<Lambertian>(Vector3(.12, .45, .15));
+	auto light = std::make_shared<DiffuseLight>(Vector3(15, 15, 15));
+
+	m_world.Add(std::make_shared<Quad>(Vector3(555, 0, 0), Vector3(0, 555, 0), Vector3(0, 0, 555), green));
+	m_world.Add(std::make_shared<Quad>(Vector3(0, 0, 0), Vector3(0, 555, 0), Vector3(0, 0, 555), red));
+	m_world.Add(std::make_shared<Quad>(Vector3(343, 554, 332), Vector3(-130, 0, 0), Vector3(0, 0, -105), light));
+	m_world.Add(std::make_shared<Quad>(Vector3(0, 0, 0), Vector3(555, 0, 0), Vector3(0, 0, 555), white));
+	m_world.Add(std::make_shared<Quad>(Vector3(555, 555, 555), Vector3(-555, 0, 0), Vector3(0, 0, -555), white));
+	m_world.Add(std::make_shared<Quad>(Vector3(0, 0, 555), Vector3(555, 0, 0), Vector3(0, 555, 0), white));
+
+	m_world.Add(std::make_shared<Sphere>(Vector3(277.5, 277.5, 277.5), 150, white));
+
+	m_camera.m_background = Vector3(0, 0, 0);
+	m_camera.m_fov = 40;
+	m_camera.m_lookFrom = Vector3(278, 278, -800);
+	m_camera.m_lookAt = Vector3(278, 278, 0);
+	m_camera.m_up = Vector3(0, 1, 0);
+	m_camera.m_defocusAngle = 0;
 }
 
 void SoftwareRenderer::InitializeWorld(int scene)
@@ -139,6 +187,12 @@ void SoftwareRenderer::InitializeWorld(int scene)
 	case 3:
 		QuadsScene();
 		break;
+	case 4:
+		SimpleLightScene();
+		break;
+	case 5:
+		CornellBoxScene();
+		break;
 	default:
 		std::cout << "Unknown scene " << scene << ", defaulting to sphere scene.\n";
 		SphereScene();
@@ -150,12 +204,13 @@ void SoftwareRenderer::RenderImage()
 {
 	auto startTime = std::chrono::high_resolution_clock::now();
 	
-	auto aspectRatio = 16.0f / 9.0f;
+	//auto aspectRatio = 16.0f / 9.0f;
+	auto aspectRatio = 1.0f;
 
 	m_camera.aspectRatio = aspectRatio;
-	m_camera.m_iWidth = 400;
-	m_camera.m_iSamplesPerPixel = 100;
-	m_camera.m_iMaxDepth = 10;
+	m_camera.m_iWidth = 600;
+	m_camera.m_iSamplesPerPixel = 200;
+	m_camera.m_iMaxDepth = 50;
 
 	m_camera.Initialize();
 	m_camera.Render(m_world);

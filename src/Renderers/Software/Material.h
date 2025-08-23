@@ -13,6 +13,11 @@ public:
 	{
 		return false;
 	}
+
+	virtual Vector3 Emitted(double u, double v, const Vector3& p) const
+	{
+		return Vector3(0, 0, 0);
+	}
 };
 
 class Lambertian : public Material
@@ -92,6 +97,22 @@ private:
 		r0 *= r0;
 		return r0 + (1 - r0) * std::pow((1 - cosine), 5);
 	}
+};
+
+class DiffuseLight : public Material
+{
+public:
+
+	DiffuseLight(std::shared_ptr<Texture> a) : tex(a) {}
+	DiffuseLight(const Vector3& c) : tex(std::make_shared<SolidColour>(c)) {}
+
+	virtual Vector3 Emitted(double u, double v, const Vector3& p) const override
+	{
+		return tex->Value(u, v, p);
+	}
+
+private:
+	std::shared_ptr<Texture> tex;
 };
 
 #endif

@@ -26,6 +26,8 @@ int SceneSelectionMenu()
 	std::cout << "1: Checkered Spheres\n";
 	std::cout << "2: Earth\n";
 	std::cout << "3: Quads\n";
+	std::cout << "4: Simple Light\n";
+	std::cout << "5: Cornell Box\n";
 	std::cout << "\n";
 	std::cout << "----------------------------------------------\n\n";
 	std::cout << "Enter scene number: ";
