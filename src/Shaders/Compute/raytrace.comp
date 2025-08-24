@@ -1,5 +1,9 @@
 #version 450
 
+#extension GL_GOOGLE_include_directive : require
+
+#include "Random.glsl"
+
 layout (local_size_x = 16, local_size_y = 16) in;
 layout(rgba16f, set = 0, binding = 0) uniform image2D image;
 
@@ -50,7 +54,13 @@ layout(push_constant) uniform constants
     int maxBounces;
 
     vec3 pixelDeltaV;
+    float defocusAngle;
+
     vec3 cameraPosition;
+
+    vec3 defocusU;
+    vec3 defocusV;
+
 } PushConstants;
 
 bool IntersectSphere(Ray ray, Sphere sphere, Interval t, out RayHit rec)
@@ -79,6 +89,21 @@ bool IntersectSphere(Ray ray, Sphere sphere, Interval t, out RayHit rec)
     rec.colour = sphere.colour;
 
 	return true;
+}
+
+float LinearToGamma(float linearComponent)
+{
+    if(linearComponent > 0)
+		return sqrt(linearComponent);
+
+    return 0;
+}
+
+vec3 GetEnvironmentColour(Ray ray)
+{
+    vec3 unitDirection = normalize(ray.direction);
+    float t = 0.5 * (unitDirection.y + 1.0);
+    return (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
 }
 
 vec3 Raytrace(Ray ray)
@@ -115,31 +140,59 @@ vec3 Raytrace(Ray ray)
         }
     }
 
+    vec3 colour = vec3(0.0,0.0,0.0);
     if(hitObject)
-    {
-        return rec.colour;
-    }
-    return vec3(0.0);
+        colour = rec.colour;
+    else
+        colour = GetEnvironmentColour(ray);
+
+    colour[0] = LinearToGamma(colour[0]);
+    colour[1] = LinearToGamma(colour[1]);
+    colour[2] = LinearToGamma(colour[2]);
+
+    return colour;
+}
+
+vec3 DefocusDiskSample(uint seed)
+{
+	vec3 p = RandomInUnitDisk(seed);
+	return PushConstants.cameraPosition + p.x * PushConstants.defocusU + p.y * PushConstants.defocusV;
+}
+
+Ray GetRay(ivec2 pixelCoord, uint seed)
+{
+    Ray ray;
+
+    vec3 offset = SampleSquare(seed);
+	vec3 pixel_sample = PushConstants.pixel00Location + ((pixelCoord.x + offset.x) * PushConstants.pixelDeltaU) + ((pixelCoord.y + offset.y) * PushConstants.pixelDeltaV);
+
+	vec3 ray_origin = (PushConstants.defocusAngle <= 0) ? PushConstants.cameraPosition : DefocusDiskSample(seed);
+	vec3 ray_direction = pixel_sample - ray_origin;
+
+    ray.origin = ray_origin;
+    ray.direction = normalize(ray_direction);
+
+    return ray;
 }
 
 void main() 
 {
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
-	ivec2 size = imageSize(image);
-    if(texelCoord.x < size.x && texelCoord.y < size.y)
+    ivec2 size = imageSize(image);
+
+    if (texelCoord.x < size.x && texelCoord.y < size.y)
     {
-        vec4 colour = vec4(0,0,0,1);
-        for(int i = 0; i < PushConstants.raysPerPixel; i++)
+        vec4 colour = vec4(0, 0, 0, 1);
+        uint seed = SeedFromCoords(texelCoord.x, texelCoord.y);
+
+        for (int i = 0; i < PushConstants.raysPerPixel; i++)
         {
-			vec3 pixelLocation = PushConstants.pixel00Location + (texelCoord.x * PushConstants.pixelDeltaU) + (texelCoord.y * PushConstants.pixelDeltaV);
-			vec3 rayDirection = pixelLocation - PushConstants.cameraPosition;
+            float junk = RandomSeed(seed);
 
-			Ray ray;
-            ray.origin = PushConstants.cameraPosition;
-            ray.direction = normalize(rayDirection);
-
+            Ray ray = GetRay(texelCoord, seed);
             colour.rgb += Raytrace(ray);
         }
+
         colour.rgb /= float(PushConstants.raysPerPixel);
 
         imageStore(image, texelCoord, colour);

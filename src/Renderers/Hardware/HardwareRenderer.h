@@ -17,6 +17,7 @@
 #include "Window.h"
 #include "InputManager.h"
 #include "PerformanceStats.h"
+#include "RaytracerTypes.h"
 #include "Imgui/ImGui.h"
 
 struct DeletionQueue
@@ -66,10 +67,7 @@ struct CameraSettings
 	glm::vec3 cameraLookDirection = glm::vec3(0,0,-1);
 	float cameraFov = 90.0f;
 	float focusDistance = 10.0f;
-	float defocusAngle = 0.0;
-
-	glm::vec3 defocusDiskU;
-	glm::vec3 defocusDiskV;
+	float defocusAngle = 0.0f;
 };
 
 class HardwareRenderer

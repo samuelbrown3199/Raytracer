@@ -84,6 +84,7 @@ set (
 	Renderers/Hardware/InputManager.cpp
 	Renderers/Hardware/Window.h
 	Renderers/Hardware/Window.cpp
+	Renderers/Hardware/RaytracerTypes.h
 	Renderers/Hardware/HardwareRenderer.h
 	Renderers/Hardware/HardwareRenderer.cpp
 )
@@ -94,6 +95,7 @@ set (
 	
 	Shaders/Compute/sky.comp
 	Shaders/Compute/raytrace.comp
+	Shaders/Compute/Random.glsl
 )
 
 add_executable(Raytracer

@@ -458,13 +458,14 @@ void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
 	glm::vec3 pixel00Location = viewportUpperLeft + 0.5 * (pixelDeltaU + pixelDeltaV);
 
 	auto defocusRadius = m_camera.focusDistance * std::tan(glm::radians(m_camera.defocusAngle / 2.0));
-	m_camera.defocusDiskU = defocusRadius * u;
-	m_camera.defocusDiskV = defocusRadius * v;
 
 	m_pushConstants.pixel00Location = pixel00Location;
 	m_pushConstants.pixelDeltaU = pixelDeltaU;
 	m_pushConstants.pixelDeltaV = pixelDeltaV;
 	m_pushConstants.cameraPosition = m_camera.cameraPosition;
+	m_pushConstants.defocusAngle = m_camera.defocusAngle;
+	m_pushConstants.defocusDiskU = defocusRadius * u;
+	m_pushConstants.defocusDiskV = defocusRadius * v;
 
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipeline);
 	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipelineLayout, 0, 1, &m_drawImageDescriptors, 0, nullptr);
@@ -621,8 +622,8 @@ void HardwareRenderer::MainLoop()
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
 			ImGui::DragFloat("Field of View", &m_camera.cameraFov, 0.1f, 1.0f, 179.0f);
-			ImGui::DragFloat("Focus Distance", &m_camera.focusDistance, 0.1f, 0.1f, 1000.0f);
-			ImGui::DragFloat("Defocus Angle", &m_camera.defocusAngle, 0.1f, 0.0f, 90.0f);
+			//ImGui::DragFloat("Focus Distance", &m_camera.focusDistance, 0.1f, 0.1f, 1000.0f);
+			//ImGui::DragFloat("Defocus Angle", &m_camera.defocusAngle, 0.1f, 0.0f, 90.0f);
 
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 			ImGui::SeparatorText("Render Settings");
