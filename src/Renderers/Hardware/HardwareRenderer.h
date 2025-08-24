@@ -7,6 +7,9 @@
 #include "Vulkan/VulkanTypes.h"
 #include "Vulkan/VulkanDescriptors.h"
 #include "Window.h"
+#include "InputManager.h"
+#include "PerformanceStats.h"
+#include "Imgui/ImGui.h"
 
 struct DeletionQueue
 {
@@ -104,10 +107,14 @@ private:
 
 	VkDescriptorSet m_drawImageDescriptors;
 	VkDescriptorSetLayout m_drawImageDescriptorLayout;
-	VkDescriptorSetLayout m_storageImageDescriptorLayout;
+
+	ImGuiContext* m_imguiContext;
 
 	VkPipeline m_raytracePipeline;
 	VkPipelineLayout m_raytracePipelineLayout;
+
+	PerformanceStats m_performanceStats;
+	InputManager m_inputManager;
 
 	void InitializeVulkan();
 	void CreateInstance();
@@ -115,6 +122,7 @@ private:
 	void InitializeCommands();
 	void InitializeSyncStructures();
 	void InitializeDescriptors();
+	void InitializeImgui();
 	void InitializePipelines();
 
 	SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
@@ -130,7 +138,10 @@ private:
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 		void* pUserData);
 
+	void Quit();
+
 	void DispatchRayTracingCommands(VkCommandBuffer cmd);
+	void RenderImGui(VkCommandBuffer cmd, VkImage targetImage, VkImageView targetImageView);
 	virtual void RenderFrame();
 	void MainLoop();
 

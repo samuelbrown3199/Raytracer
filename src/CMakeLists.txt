@@ -43,7 +43,43 @@ set (
 	Renderers/Hardware/Vulkan/VulkanPipelines.h
 	Renderers/Hardware/Vulkan/VulkanPipelines.cpp
 	Renderers/Hardware/Vulkan/VulkanTypes.h
+	
+	Renderers/Hardware/Imgui/imconfig.h
+	Renderers/Hardware/Imgui/imgui.h
+	Renderers/Hardware/Imgui/imgui.cpp
+	Renderers/Hardware/Imgui/imgui_demo.cpp
+	Renderers/Hardware/Imgui/imgui_draw.cpp
+	Renderers/Hardware/Imgui/imgui_internal.h
+	Renderers/Hardware/Imgui/imgui_tables.cpp
+	Renderers/Hardware/Imgui/imgui_widgets.cpp
+	Renderers/Hardware/Imgui/imstb_rectpack.h
+	Renderers/Hardware/Imgui/imstb_textedit.h
+	Renderers/Hardware/Imgui/imstb_truetype.h
+	Renderers/Hardware/Imgui/imgui_stdlib.h
+	Renderers/Hardware/Imgui/imgui_stdlib.cpp
 
+	Renderers/Hardware/Imgui/imgui.h
+	Renderers/Hardware/Imgui/imgui.cpp
+	Renderers/Hardware/Imgui/backends/imgui_impl_vulkan.h
+	Renderers/Hardware/Imgui/backends/imgui_impl_vulkan.cpp
+
+	Renderers/Hardware/Imgui/implot.h
+	Renderers/Hardware/Imgui/implot.cpp
+	Renderers/Hardware/Imgui/implot_demo.cpp
+	Renderers/Hardware/Imgui/implot_internal.h
+	Renderers/Hardware/Imgui/implot_items.cpp
+
+	Renderers/Hardware/Imgui/backends/imgui_impl_sdl3.h
+	Renderers/Hardware/Imgui/backends/imgui_impl_sdl3.cpp
+
+	Renderers/Hardware/Imgui/ImGuiFileDialog.h
+	Renderers/Hardware/Imgui/ImGuiFileDialog.cpp
+	Renderers/Hardware/Imgui/ImGuiFileDialogConfig.h
+
+	Renderers/Hardware/PerformanceStats.h
+	Renderers/Hardware/PerformanceStats.cpp
+	Renderers/Hardware/InputManager.h
+	Renderers/Hardware/InputManager.cpp
 	Renderers/Hardware/Window.h
 	Renderers/Hardware/Window.cpp
 	Renderers/Hardware/HardwareRenderer.h
@@ -54,7 +90,6 @@ set (
 
 	shader_source
 	
-	Shaders/Compute/gradient.comp
 	Shaders/Compute/sky.comp
 )
 

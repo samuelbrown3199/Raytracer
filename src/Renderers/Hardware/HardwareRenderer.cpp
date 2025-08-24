@@ -9,6 +9,9 @@
 #include "Vulkan/VulkanImages.h"
 #include "Vulkan/VulkanInitialisers.h"
 #include "Vulkan/VulkanPipelines.h"
+#include "Imgui/backends/imgui_impl_sdl3.h"
+#include "Imgui/backends/imgui_impl_vulkan.h"
+#include "Imgui/implot.h"
 
 void HardwareRenderer::InitializeVulkan()
 {
@@ -17,6 +20,7 @@ void HardwareRenderer::InitializeVulkan()
 	InitializeSwapchain();
 	InitializeCommands();
 	InitializeSyncStructures();
+	InitializeImgui();
 	InitializePipelines();
 
 	m_bInitialized = true;
@@ -327,6 +331,71 @@ void HardwareRenderer::InitializeDescriptors()
 		});
 }
 
+void HardwareRenderer::InitializeImgui()
+{
+	// 1: create descriptor pool for IMGUI
+	//  the size of the pool is very oversize, but it's copied from imgui demo
+	//  itself.
+	VkDescriptorPoolSize pool_sizes[] = { { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+		{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 } };
+
+	VkDescriptorPoolCreateInfo pool_info = {};
+	pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	pool_info.maxSets = 1000;
+	pool_info.poolSizeCount = (uint32_t)std::size(pool_sizes);
+	pool_info.pPoolSizes = pool_sizes;
+
+	VkDescriptorPool imguiPool;
+	if (vkCreateDescriptorPool(m_device, &pool_info, nullptr, &imguiPool) != VK_SUCCESS)
+		throw std::exception();
+
+	// 2: initialize imgui library
+
+	// this initializes the core structures of imgui
+	m_imguiContext = ImGui::CreateContext();
+	ImPlot::CreateContext();
+
+	// this initializes imgui for SDL
+	ImGui_ImplSDL3_InitForVulkan(m_pWindow->GetSDLWindow());
+
+	// this initializes imgui for Vulkan
+	ImGui_ImplVulkan_InitInfo init_info = {};
+	init_info.Instance = m_vulkanInstance;
+	init_info.PhysicalDevice = m_physicalDevice;
+	init_info.Device = m_device;
+	init_info.Queue = m_graphicsQueue;
+	init_info.DescriptorPool = imguiPool;
+	init_info.MinImageCount = 3;
+	init_info.ImageCount = 3;
+	init_info.UseDynamicRendering = true;
+	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+
+	VkPipelineRenderingCreateInfo pipelineCreateInfo{ .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR, .colorAttachmentCount = 1, .pColorAttachmentFormats = &m_swapchainImageFormat };
+	init_info.PipelineRenderingCreateInfo = pipelineCreateInfo;
+
+	ImGui_ImplVulkan_Init(&init_info);
+	ImGui_ImplVulkan_CreateFontsTexture();
+
+	std::lock_guard<std::mutex> lock(m_deletionQueueMutex);
+	m_mainDeletionQueue.push_function([=]()
+		{
+			ImPlot::DestroyContext();
+			ImGui_ImplVulkan_Shutdown();
+
+			vkDestroyDescriptorPool(m_device, imguiPool, nullptr);
+		});
+}
+
 void HardwareRenderer::InitializePipelines()
 {
 	{
@@ -359,12 +428,31 @@ void HardwareRenderer::InitializePipelines()
 	}
 }
 
+void HardwareRenderer::Quit()
+{
+	m_bRun = false;
+}
+
 void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
 {
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipeline);
 	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipelineLayout, 0, 1, &m_drawImageDescriptors, 0, nullptr);
 
 	vkCmdDispatch(cmd, m_drawExtent.width / 16, m_drawExtent.height / 16, 1);
+}
+
+void HardwareRenderer::RenderImGui(VkCommandBuffer cmd, VkImage targetImage, VkImageView targetImageView)
+{
+	ImGui::Render();
+
+	VkRenderingAttachmentInfo colorAttachment = AttachmentInfo(targetImageView, nullptr, VK_IMAGE_LAYOUT_GENERAL);
+	VkRenderingInfo renderInfo = RenderingInfo(m_swapchainExtent, &colorAttachment, nullptr);
+
+	TransitionImage(cmd, targetImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+	vkCmdBeginRendering(cmd, &renderInfo);
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+	vkCmdEndRendering(cmd);
 }
 
 void HardwareRenderer::RenderFrame()
@@ -429,11 +517,9 @@ void HardwareRenderer::RenderFrame()
 	TransitionImage(cmd, m_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	CopyImageToImage(cmd, m_drawImage.m_image, m_swapchainImages[swapchainImageIndex], m_drawExtent, m_swapchainExtent, m_drawFilter);
 	TransitionImage(cmd, m_drawImage.m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
-	TransitionImage(cmd, m_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-	//TODO: IMGUI
-	//RenderImGui(cmd, m_swapchainImages[swapchainImageIndex], m_swapchainImageViews[swapchainImageIndex]);
 
-	// set swapchain image layout to Present so we can show it on the screen
+	RenderImGui(cmd, m_swapchainImages[swapchainImageIndex], m_swapchainImageViews[swapchainImageIndex]);
+
 	TransitionImage(cmd, m_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
 	if (vkEndCommandBuffer(cmd) != VK_SUCCESS)
@@ -476,22 +562,28 @@ void HardwareRenderer::RenderFrame()
 
 void HardwareRenderer::MainLoop()
 {
+	ImGuiIO& io = ImGui::GetIO();
 	while (m_bRun)
 	{
-		SDL_Event e;
-		while (SDL_PollEvent(&e) != 0)
-		{
-			if (e.type == SDL_EVENT_QUIT)
-				m_bRun = false;
-		}
+		m_performanceStats.StartPerformanceMeasurement("Frame");
+
+		m_inputManager.HandleGeneralInput();
+		ImGui_ImplVulkan_NewFrame();
+		ImGui_ImplSDL3_NewFrame();
+		ImGui::NewFrame();
 
 		m_pWindow->CheckScreenSizeForUpdate(this);
 		RenderFrame();
+
+		m_performanceStats.EndPerformanceMeasurement("Frame");
+		m_performanceStats.UpdatePerformanceStats();
 	}
 }
 
 void HardwareRenderer::InitializeRenderer()
 {
+	m_inputManager.SetQuitFunction([this]() { this->Quit(); });
+
 	InitializeVulkan();
 	MainLoop();
 }
