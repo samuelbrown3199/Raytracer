@@ -1,0 +1,31 @@
+#version 450
+layout (local_size_x = 16, local_size_y = 16) in;
+layout(rgba16f,set = 0, binding = 0) uniform image2D image;
+
+struct Sphere
+{
+    vec3 center;
+    float radius;
+    vec3 colour;
+};
+
+layout( push_constant ) uniform constants
+{	
+    vec3 cameraPosition;
+    vec3 cameraLookDirection;
+    float cameraFov;
+
+    int raysPerPixel;
+    int maxBounces;
+} PushConstants;
+
+void main() 
+{
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+	ivec2 size = imageSize(image);
+    if(texelCoord.x < size.x && texelCoord.y < size.y)
+    {
+        vec4 colour = vec4(float(texelCoord.x) / float(size.x), float(texelCoord.y) / float(size.y), 0.5, 1.0);
+        imageStore(image, texelCoord, colour);
+    }   
+}

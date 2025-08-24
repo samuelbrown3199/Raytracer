@@ -95,3 +95,12 @@ struct GPUDrawPushConstants
     glm::vec4 m_objectColour;
     VkDeviceAddress m_vertexBuffer;
 };
+
+struct RaytracePushConstants
+{
+    glm::vec3 cameraPosition;
+    glm::vec3 cameraLookDirection;
+    float cameraFov = 90.0f;
+	int raysPerPixel = 3;
+	int maxBounces = 1;
+};

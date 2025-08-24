@@ -110,6 +110,8 @@ private:
 
 	ImGuiContext* m_imguiContext;
 
+	RaytracePushConstants m_pushConstants;
+
 	VkPipeline m_raytracePipeline;
 	VkPipelineLayout m_raytracePipelineLayout;
 

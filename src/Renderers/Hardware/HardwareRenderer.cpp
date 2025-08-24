@@ -402,9 +402,9 @@ void HardwareRenderer::InitializePipelines()
 		std::vector<VkDescriptorSetLayout> layouts;
 		layouts.push_back(m_drawImageDescriptorLayout);
 
-		//VkPushConstantRange pushConstant = VkPushConstantRange(VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(GradientPushConstants));
+		VkPushConstantRange pushConstant = VkPushConstantRange(VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(RaytracePushConstants));
 		std::vector<VkPushConstantRange> pushConstants;
-		//pushConstants.push_back(pushConstant);
+		pushConstants.push_back(pushConstant);
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo = PipelineLayoutCreateInfo();
 		pipelineLayoutInfo.pPushConstantRanges = pushConstants.data();
@@ -416,7 +416,7 @@ void HardwareRenderer::InitializePipelines()
 
 		PipelineBuilder pipelineBuilder;
 
-		std::string computePath = GetWorkingDirectory() + "\\Resources\\Shaders\\sky.spv";
+		std::string computePath = GetWorkingDirectory() + "\\Resources\\Shaders\\raytrace.spv";
 		VkShaderModule computeShader;
 		LoadShaderModule(computePath.c_str(), m_device, &computeShader);
 
@@ -438,7 +438,11 @@ void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipeline);
 	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipelineLayout, 0, 1, &m_drawImageDescriptors, 0, nullptr);
 
-	vkCmdDispatch(cmd, m_drawExtent.width / 16, m_drawExtent.height / 16, 1);
+	vkCmdPushConstants(cmd, m_raytracePipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(RaytracePushConstants), &m_pushConstants);
+
+	uint32_t groupCountX = (m_drawExtent.width + 15) / 16;
+	uint32_t groupCountY = (m_drawExtent.height + 15) / 16;
+	vkCmdDispatch(cmd, groupCountX, groupCountY, 1);
 }
 
 void HardwareRenderer::RenderImGui(VkCommandBuffer cmd, VkImage targetImage, VkImageView targetImageView)
@@ -568,9 +572,38 @@ void HardwareRenderer::MainLoop()
 		m_performanceStats.StartPerformanceMeasurement("Frame");
 
 		m_inputManager.HandleGeneralInput();
+		if (m_pWindow->IsWindowMinimized())
+			continue;
+
 		ImGui_ImplVulkan_NewFrame();
 		ImGui_ImplSDL3_NewFrame();
 		ImGui::NewFrame();
+
+		{
+			ImGui::Begin("Raytracer Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+
+			ImGui::SeparatorText("Camera Settings");
+			ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
+			static float cameraPosition[3]{ 0, 0, -5 };
+			ImGui::DragFloat3("Camera Position", cameraPosition, 0.1f);
+			m_pushConstants.cameraPosition = glm::vec3(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+
+			static float cameraLookAt[3]{ 0, 0, 0 };
+			ImGui::DragFloat3("Camera Look Direction", cameraLookAt, 0.1f);
+			m_pushConstants.cameraLookDirection = glm::normalize(glm::vec3(cameraLookAt[0], cameraLookAt[1], cameraLookAt[2]));
+
+			ImGui::DragFloat("Field of View", &m_pushConstants.cameraFov, 0.1f, 1.0f, 179.0f);
+
+			ImGui::Dummy(ImVec2(0.0f, 5.0f));
+			ImGui::SeparatorText("Render Settings");
+			ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
+			ImGui::DragInt("Rays Per Pixel", &m_pushConstants.raysPerPixel, 1, 1, 100);
+			ImGui::DragInt("Max Bounces", &m_pushConstants.maxBounces, 1, 1, 100);
+
+			ImGui::End();
+		}
 
 		m_pWindow->CheckScreenSizeForUpdate(this);
 		RenderFrame();

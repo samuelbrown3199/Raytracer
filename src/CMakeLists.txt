@@ -91,6 +91,7 @@ set (
 	shader_source
 	
 	Shaders/Compute/sky.comp
+	Shaders/Compute/raytrace.comp
 )
 
 add_executable(Raytracer
