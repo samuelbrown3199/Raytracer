@@ -13,6 +13,8 @@
 #include "Imgui/backends/imgui_impl_vulkan.h"
 #include "Imgui/implot.h"
 
+#include "../Software/Common.h"
+
 #include "CameraController.h"
 
 void HardwareRenderer::InitializeVulkan()
@@ -289,7 +291,8 @@ void HardwareRenderer::InitializeDescriptors()
 {
 	std::vector<DescriptorAllocator::PoolSizeRatio> sizes =
 	{
-		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 }
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 }
 	};
 
 	m_globalDescriptorAllocator.InitializePool(m_device, 10, sizes);
@@ -301,7 +304,14 @@ void HardwareRenderer::InitializeDescriptors()
 		m_drawImageDescriptorLayout = builder.Build(m_device);
 	}
 
+	{
+		DescriptorLayoutBuilder builder;
+		builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+		m_sceneSphereDescriptorLayout = builder.Build(m_device);
+	}
+
 	m_drawImageDescriptors = m_globalDescriptorAllocator.Allocate(m_device, m_drawImageDescriptorLayout);
+	m_sceneSphereDescriptor = m_globalDescriptorAllocator.Allocate(m_device, m_sceneSphereDescriptorLayout);
 
 	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
@@ -403,6 +413,7 @@ void HardwareRenderer::InitializePipelines()
 	{
 		std::vector<VkDescriptorSetLayout> layouts;
 		layouts.push_back(m_drawImageDescriptorLayout);
+		layouts.push_back(m_sceneSphereDescriptorLayout);
 
 		VkPushConstantRange pushConstant = VkPushConstantRange(VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(RaytracePushConstants));
 		std::vector<VkPushConstantRange> pushConstants;
@@ -433,6 +444,65 @@ void HardwareRenderer::InitializePipelines()
 void HardwareRenderer::Quit()
 {
 	m_bRun = false;
+}
+
+void HardwareRenderer::InitializeScene()
+{
+	GPUSphere groundSphere;
+	groundSphere.center = glm::vec3(0, -1000, -5);
+	groundSphere.radius = 1000.0;
+	groundSphere.colour = glm::vec3(0.5, 0.5, 0.5);
+
+	for (int i = -5; i < 5; ++i)
+	{
+		for (int j = -5; j < 5; ++j)
+		{
+			glm::vec3 center(i + 0.9 * RandomDouble(), 0.2, j + 0.9 * RandomDouble());
+
+			if ((center - glm::vec3(4, 0.2, 0)).length() > 0.9)
+			{
+				glm::vec3 albedo = glm::vec3(RandomDouble(), RandomDouble(), RandomDouble());
+				GPUSphere newSphere;
+
+				newSphere.center = center;
+				newSphere.radius = 0.2;
+				newSphere.colour = albedo;
+
+				m_sceneSpheres.push_back(newSphere);
+			}
+		}
+	}
+
+	GPUSphere testSphere;
+	testSphere.center = glm::vec3(0, 1, 0);
+	testSphere.radius = 1.0;
+	testSphere.colour = glm::vec3(1.0, 1.0, 1.0);
+	m_sceneSpheres.push_back(testSphere);
+
+	testSphere.center = glm::vec3(-4, 1, 0);
+	testSphere.colour = glm::vec3(0.4, 0.2, 0.1);
+	m_sceneSpheres.push_back(testSphere);
+
+	testSphere.center = glm::vec3(4, 1, 0);
+	testSphere.colour = glm::vec3(0.7, 0.6, 0.5);
+	m_sceneSpheres.push_back(testSphere);
+
+	m_sceneSpheres.push_back(groundSphere);
+
+	BufferSceneData();
+}
+
+void HardwareRenderer::BufferSceneData()
+{
+	m_sceneSphereBuffer = CreateBuffer(sizeof(GPUSphere) * m_sceneSpheres.size(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneSphereBuffer");
+	void* data;
+	vmaMapMemory(m_allocator, m_sceneSphereBuffer.m_allocation, &data);
+	memcpy(data, m_sceneSpheres.data(), sizeof(GPUSphere) * m_sceneSpheres.size());
+	vmaUnmapMemory(m_allocator, m_sceneSphereBuffer.m_allocation);
+
+	DescriptorWriter writer;
+	writer.WriteBuffer(0, m_sceneSphereBuffer.m_buffer, sizeof(GPUSphere) * m_sceneSpheres.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.UpdateSet(m_device, m_sceneSphereDescriptor);
 }
 
 void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
@@ -466,9 +536,14 @@ void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
 	m_pushConstants.defocusAngle = m_camera.defocusAngle;
 	m_pushConstants.defocusDiskU = defocusRadius * u;
 	m_pushConstants.defocusDiskV = defocusRadius * v;
+	m_pushConstants.sphereCount = m_sceneSpheres.size();
+
+	std::vector<VkDescriptorSet> sets;
+	sets.push_back(m_drawImageDescriptors);
+	sets.push_back(m_sceneSphereDescriptor);
 
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipeline);
-	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipelineLayout, 0, 1, &m_drawImageDescriptors, 0, nullptr);
+	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipelineLayout, 0, sets.size(), sets.data(), 0, nullptr);
 
 	vkCmdPushConstants(cmd, m_raytracePipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(RaytracePushConstants), &m_pushConstants);
 
@@ -658,6 +733,8 @@ void HardwareRenderer::InitializeRenderer()
 	m_inputManager.SetQuitFunction([this]() { this->Quit(); });
 
 	InitializeVulkan();
+	InitializeScene();
+
 	MainLoop();
 }
 

@@ -45,6 +45,11 @@ struct Sphere
     vec3 colour;
 };
 
+layout(set=1, binding=0) readonly buffer SphereBuffer
+{
+	Sphere spheres[];
+};
+
 layout(push_constant) uniform constants
 {	
     vec3 pixel00Location;
@@ -57,6 +62,7 @@ layout(push_constant) uniform constants
     float defocusAngle;
 
     vec3 cameraPosition;
+    int sphereCount;
 
     vec3 defocusU;
     vec3 defocusV;
@@ -108,18 +114,6 @@ vec3 GetEnvironmentColour(Ray ray)
 
 vec3 Raytrace(Ray ray)
 {
-    Sphere testSphere;
-    testSphere.center = vec3(0,0,-5);
-    testSphere.radius = 1.0;
-    testSphere.colour = vec3(1,0,0);
-
-    Sphere groundSphere;
-    groundSphere.center = vec3(0,-1001,-5);
-    groundSphere.radius = 1000.0;
-    groundSphere.colour = vec3(0.5,0.5,0.5);
-
-    Sphere spheres[2] = Sphere[2](testSphere, groundSphere);
-
     Interval t;
     t.min = 0.001;
     t.max = 100000;
@@ -128,7 +122,7 @@ vec3 Raytrace(Ray ray)
     RayHit rec;
 
     bool hitObject = false;
-    for(int i = 0; i < 2; i++)
+    for(int i = 0; i < PushConstants.sphereCount; i++)
     {
         Interval newInterval;
         newInterval.min = t.min;

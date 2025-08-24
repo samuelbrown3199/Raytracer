@@ -138,6 +138,11 @@ private:
 	PerformanceStats m_performanceStats;
 	InputManager m_inputManager;
 
+	std::vector<GPUSphere> m_sceneSpheres;
+	AllocatedBuffer m_sceneSphereBuffer;
+	VkDescriptorSet m_sceneSphereDescriptor;
+	VkDescriptorSetLayout m_sceneSphereDescriptorLayout;
+
 	void InitializeVulkan();
 	void CreateInstance();
 	void InitializeSwapchain();
@@ -161,6 +166,9 @@ private:
 		void* pUserData);
 
 	void Quit();
+
+	void InitializeScene();
+	void BufferSceneData();
 
 	void DispatchRayTracingCommands(VkCommandBuffer cmd);
 	void RenderImGui(VkCommandBuffer cmd, VkImage targetImage, VkImageView targetImageView);

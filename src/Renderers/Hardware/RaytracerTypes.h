@@ -31,11 +31,19 @@ struct RaytracePushConstants
     float defocusAngle;
 
 	glm::vec3 cameraPosition;
-    float padding4;
+    int sphereCount;
 
 	glm::vec3 defocusDiskU;
 	float padding5;
 
 	glm::vec3 defocusDiskV;
     float padding6;
+};
+
+struct GPUSphere
+{
+	glm::vec3 center;
+	float radius;
+	glm::vec3 colour;
+	float padding;
 };
