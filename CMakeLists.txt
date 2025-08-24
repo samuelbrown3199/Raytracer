@@ -31,3 +31,17 @@ add_subdirectory("externals/vk-bootstrap")
 set_target_properties(vk-bootstrap PROPERTIES FOLDER Externals)
 
 add_subdirectory("src")
+
+set(COMPILE_SHADER_BAT "${CMAKE_CURRENT_SOURCE_DIR}/CompileShaders.bat")
+if(NOT EXISTS ${COMPILE_SHADER_BAT})
+    message(FATAL_ERROR "Batch file 'CompileShaders.bat' not found!")
+endif()
+
+add_custom_target(CompileShaders
+    COMMAND ${CMAKE_COMMAND} -E echo "Running shader compilation..."
+    COMMAND ${COMPILE_SHADER_BAT}  # Run the batch file to compile shaders
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}  # Ensure batch is run in the correct directory
+    COMMENT "Compiling shaders..."
+)
+
+add_dependencies(Raytracer CompileShaders)

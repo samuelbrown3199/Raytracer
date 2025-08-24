@@ -17,6 +17,7 @@ void HardwareRenderer::InitializeVulkan()
 	InitializeCommands();
 	InitializeSyncStructures();
 	InitializeDescriptors();
+	InitializePipelines();
 
 	m_bInitialized = true;
 }
@@ -326,24 +327,50 @@ void HardwareRenderer::InitializeDescriptors()
 		});
 }
 
+void HardwareRenderer::InitializePipelines()
+{
+	{
+		std::vector<VkDescriptorSetLayout> layouts;
+		layouts.push_back(m_drawImageDescriptorLayout);
+
+		//VkPushConstantRange pushConstant = VkPushConstantRange(VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(GradientPushConstants));
+		std::vector<VkPushConstantRange> pushConstants;
+		//pushConstants.push_back(pushConstant);
+
+		VkPipelineLayoutCreateInfo pipelineLayoutInfo = PipelineLayoutCreateInfo();
+		pipelineLayoutInfo.pPushConstantRanges = pushConstants.data();
+		pipelineLayoutInfo.pushConstantRangeCount = pushConstants.size();
+		pipelineLayoutInfo.pSetLayouts = layouts.data();
+		pipelineLayoutInfo.setLayoutCount = layouts.size();
+		if (vkCreatePipelineLayout(GetLogicalDevice(), &pipelineLayoutInfo, nullptr, &m_raytracePipelineLayout) != VK_SUCCESS)
+			throw std::exception(FormatString("Failed to create pipeline layout for pipeline.").c_str());
+
+		PipelineBuilder pipelineBuilder;
+
+		std::string computePath = GetWorkingDirectory() + "\\Resources\\Shaders\\sky.spv";
+		VkShaderModule computeShader;
+		LoadShaderModule(computePath.c_str(), m_device, &computeShader);
+
+		pipelineBuilder.SetComputeShader(computeShader);
+		pipelineBuilder.m_pipelineLayout = m_raytracePipelineLayout;
+		m_raytracePipeline = pipelineBuilder.BuildComputePipeline(GetLogicalDevice());
+
+		vkDestroyShaderModule(m_device, computeShader, nullptr);
+	}
+}
+
 void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
 {
+	GradientPushConstants constants;
+	constants.m_bottomLeftColour = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+	constants.m_topRightColour = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
+	constants.m_bottomRightColour = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+	constants.m_topRightColour = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
 
-	//Temporary: Clear the image to red.
-	VkClearColorValue clearValue;
-	clearValue = { { 1.0f, 0.0f, 0.0f, 1.0f } };
-	VkImageSubresourceRange clearRange = ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
-	vkCmdClearColorImage(cmd, m_drawImage.m_image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipeline);
+	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipelineLayout, 0, 1, &m_drawImageDescriptors, 0, nullptr);
 
-	/*VkDescriptorSet storageImageDescriptor = GetCurrentFrame().m_frameDescriptors.AllocateSet(m_device, m_storageImageDescriptorLayout);
-	DescriptorWriter writer;
-	writer.WriteImage(0, m_drawImage.m_imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-	writer.UpdateSet(m_device, storageImageDescriptor);
-
-	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipeline);
-	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipelineLayout, 0, 1, &storageImageDescriptor, 0, nullptr);
-
-	vkCmdDispatch(cmd, m_drawExtent.width / 16, m_drawExtent.height / 16, 1);*/
+	vkCmdDispatch(cmd, m_drawExtent.width / 16, m_drawExtent.height / 16, 1);
 }
 
 void HardwareRenderer::RenderFrame()

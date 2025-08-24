@@ -104,6 +104,10 @@ private:
 
 	VkDescriptorSet m_drawImageDescriptors;
 	VkDescriptorSetLayout m_drawImageDescriptorLayout;
+	VkDescriptorSetLayout m_storageImageDescriptorLayout;
+
+	VkPipeline m_raytracePipeline;
+	VkPipelineLayout m_raytracePipelineLayout;
 
 	void InitializeVulkan();
 	void CreateInstance();
@@ -111,6 +115,7 @@ private:
 	void InitializeCommands();
 	void InitializeSyncStructures();
 	void InitializeDescriptors();
+	void InitializePipelines();
 
 	SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
 	VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);

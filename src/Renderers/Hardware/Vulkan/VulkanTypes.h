@@ -58,32 +58,6 @@ struct Vertex
     }
 };
 
-struct ChunkVertex
-{
-    glm::vec3 m_position;   // 12B
-    float m_pad0 = 0.0f;    // Pad to 16B
-
-    glm::vec3 m_normal;     // 12B
-    float m_sunlightLevel = 0.0f;
-
-    glm::vec2 m_uv;         // 8B
-    int m_texLayer = 0;     // 4B
-    int m_pad2 = 0;         // Pad to 16B total
-
-    bool operator==(const ChunkVertex& other) const
-    {
-        return m_position == other.m_position &&
-            m_normal == other.m_normal &&
-            m_uv == other.m_uv &&
-            m_texLayer == other.m_texLayer;
-    }
-
-    ChunkVertex() = default;
-    ChunkVertex(glm::vec3 pos, glm::vec2 uv, glm::vec3 normal, int texLayer, float sunlightLevel)
-        : m_position(pos), m_normal(normal), m_uv(uv), m_texLayer(texLayer), m_sunlightLevel(sunlightLevel) {
-    }
-};
-
 namespace std
 {
     template<> struct hash<Vertex>
@@ -105,28 +79,6 @@ struct GPUMeshBuffers
     VkDeviceAddress m_vertexBufferAddress;
 };
 
-struct GPUPointLight
-{
-    alignas(16) glm::vec3 position;
-
-    alignas(16) glm::vec3 diffuseLight;
-    alignas(16) glm::vec3 specularLight;
-
-    alignas(4) float constant;
-    alignas(4) float linear;
-    alignas(4) float quadratic;
-    alignas(4) float intensity;
-};
-
-struct GPUDirectionalLight
-{
-    alignas(16) glm::vec3 direction;
-    alignas(4) float intensity;
-
-    alignas(16) glm::vec3 diffuseLight;
-    alignas(16) glm::vec3 specularLight;
-};
-
 struct GPUSceneData
 {
     glm::mat4 view;
@@ -142,13 +94,4 @@ struct GPUDrawPushConstants
     glm::mat4 m_worldMatrix;
     glm::vec4 m_objectColour;
     VkDeviceAddress m_vertexBuffer;
-};
-
-struct GPUChunkPushConstants
-{
-    glm::mat4 m_worldMatrix;
-    VkDeviceAddress m_vertexBuffer;
-
-	float m_daylightLevel = 1.0f;
-    float m_time;
 };

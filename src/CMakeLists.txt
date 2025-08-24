@@ -50,11 +50,20 @@ set (
 	Renderers/Hardware/HardwareRenderer.cpp
 )
 
-add_executable(Raytracer
-	${program_source}
+set (
+
+	shader_source
+	
+	Shaders/Compute/gradient.comp
+	Shaders/Compute/sky.comp
 )
 
-foreach(source IN LISTS program_source)
+add_executable(Raytracer
+	${program_source}
+	${shader_source}
+)
+
+foreach(source IN LISTS program_source shader_source)
     get_filename_component(source_path "${source}" PATH)
     string(REPLACE "/" "\\" source_path_msvc "${source_path}")
     source_group("${source_path_msvc}" FILES "${source}")
