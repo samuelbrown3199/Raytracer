@@ -547,8 +547,8 @@ void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
 
 	vkCmdPushConstants(cmd, m_raytracePipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(RaytracePushConstants), &m_pushConstants);
 
-	uint32_t groupCountX = (m_drawExtent.width + 15) / 16;
-	uint32_t groupCountY = (m_drawExtent.height + 15) / 16;
+	uint32_t groupCountX = (m_drawExtent.width + 31) / 32;
+	uint32_t groupCountY = (m_drawExtent.height + 31) / 32;
 	vkCmdDispatch(cmd, groupCountX, groupCountY, 1);
 }
 
