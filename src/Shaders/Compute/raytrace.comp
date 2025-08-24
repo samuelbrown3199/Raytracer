@@ -9,6 +9,20 @@ struct Ray
     vec3 direction;
 };
 
+struct RayHit
+{
+    vec3 point;
+    vec3 normal;
+    vec3 colour;
+    float t;
+    bool frontFace;
+};
+
+vec3 PointAtT(float t, Ray ray)
+{
+	return ray.origin + t * ray.direction;
+}
+
 struct Interval
 {
     float min;
@@ -39,7 +53,7 @@ layout(push_constant) uniform constants
     vec3 cameraPosition;
 } PushConstants;
 
-bool IntersectSphere(Ray ray, Sphere sphere, Interval t)
+bool IntersectSphere(Ray ray, Sphere sphere, Interval t, out RayHit rec)
 {
 	vec3 oc = sphere.center - ray.origin;
 	float a = length(ray.direction)*length(ray.direction);
@@ -58,12 +72,11 @@ bool IntersectSphere(Ray ray, Sphere sphere, Interval t)
 			return false;
 	}
 
-	/*rec.t = root;
-	rec.p = r.PointAtT(rec.t);
-	Vector3 outwardNormal = (rec.p - center) / radius;
-	rec.SetFaceNormal(r, outwardNormal);
-	GetSphereUV(outwardNormal, rec.u, rec.v);
-	rec.mat = mat;*/
+	rec.t = root;
+	rec.point = PointAtT(rec.t, ray);
+	vec3 outwardNormal = (rec.point - sphere.center) / sphere.radius;
+    rec.normal = outwardNormal;
+    rec.colour = sphere.colour;
 
 	return true;
 }
@@ -86,15 +99,26 @@ vec3 Raytrace(Ray ray)
     t.min = 0.001;
     t.max = 100000;
 
+    float closestSoFar = t.max;
+    RayHit rec;
+
+    bool hitObject = false;
     for(int i = 0; i < 2; i++)
     {
-        float closestSoFar = t.max;
-        if(IntersectSphere(ray, spheres[i], t))
+        Interval newInterval;
+        newInterval.min = t.min;
+        newInterval.max = closestSoFar;
+        if(IntersectSphere(ray, spheres[i], newInterval, rec))
         {
-            return spheres[i].colour;
+            closestSoFar = rec.t;
+            hitObject = true;
         }
     }
 
+    if(hitObject)
+    {
+        return rec.colour;
+    }
     return vec3(0.0);
 }
 

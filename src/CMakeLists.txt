@@ -76,6 +76,8 @@ set (
 	Renderers/Hardware/Imgui/ImGuiFileDialog.cpp
 	Renderers/Hardware/Imgui/ImGuiFileDialogConfig.h
 
+	Renderers/Hardware/CameraController.h
+	Renderers/Hardware/CameraController.cpp
 	Renderers/Hardware/PerformanceStats.h
 	Renderers/Hardware/PerformanceStats.cpp
 	Renderers/Hardware/InputManager.h

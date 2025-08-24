@@ -13,6 +13,8 @@
 #include "Imgui/backends/imgui_impl_vulkan.h"
 #include "Imgui/implot.h"
 
+#include "CameraController.h"
+
 void HardwareRenderer::InitializeVulkan()
 {
 	CreateInstance();
@@ -596,6 +598,8 @@ void HardwareRenderer::RenderFrame()
 void HardwareRenderer::MainLoop()
 {
 	ImGuiIO& io = ImGui::GetIO();
+	CameraController cameraController;
+
 	while (m_bRun)
 	{
 		m_performanceStats.StartPerformanceMeasurement("Frame");
@@ -608,21 +612,17 @@ void HardwareRenderer::MainLoop()
 		ImGui_ImplSDL3_NewFrame();
 		ImGui::NewFrame();
 
+		cameraController.Update(this);
+
 		{
 			ImGui::Begin("Raytracer Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
 			ImGui::SeparatorText("Camera Settings");
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
-			static float cameraPosition[3]{ m_camera.cameraPosition.x, m_camera.cameraPosition.y, m_camera.cameraPosition.z };
-			ImGui::DragFloat3("Camera Position", cameraPosition, 0.1f);
-			m_camera.cameraPosition = glm::vec3(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
-
-			static float cameraLookAt[3]{ m_camera.cameraLookDirection.x, m_camera.cameraLookDirection.y, m_camera.cameraLookDirection.z };
-			ImGui::DragFloat3("Camera Look Direction", cameraLookAt, 0.1f);
-			m_camera.cameraLookDirection = glm::normalize(glm::vec3(cameraLookAt[0], cameraLookAt[1], cameraLookAt[2]));
-
 			ImGui::DragFloat("Field of View", &m_camera.cameraFov, 0.1f, 1.0f, 179.0f);
+			ImGui::DragFloat("Focus Distance", &m_camera.focusDistance, 0.1f, 0.1f, 1000.0f);
+			ImGui::DragFloat("Defocus Angle", &m_camera.defocusAngle, 0.1f, 0.0f, 90.0f);
 
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 			ImGui::SeparatorText("Render Settings");

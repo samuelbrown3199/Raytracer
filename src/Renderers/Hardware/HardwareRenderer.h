@@ -75,6 +75,7 @@ struct CameraSettings
 class HardwareRenderer
 {
 	friend class Window;
+	friend class CameraController;
 
 private:
 
@@ -171,6 +172,10 @@ private:
 public:
 
 	void InitializeRenderer();
+
+	InputManager* GetInputManager() { return &m_inputManager; }
+	PerformanceStats* GetPerformanceStats() { return &m_performanceStats; }
+	Window* GetWindow() { return m_pWindow; }
 
 	int GetMaxFramesInFlight() { return MAX_FRAMES_IN_FLIGHT; }
 	int GetFrameIndex() { return m_iCurrentFrame % MAX_FRAMES_IN_FLIGHT; }
