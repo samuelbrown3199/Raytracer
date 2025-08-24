@@ -13,10 +13,10 @@
 void HardwareRenderer::InitializeVulkan()
 {
 	CreateInstance();
+	InitializeDescriptors();
 	InitializeSwapchain();
 	InitializeCommands();
 	InitializeSyncStructures();
-	InitializeDescriptors();
 	InitializePipelines();
 
 	m_bInitialized = true;
@@ -133,6 +133,10 @@ void HardwareRenderer::InitializeSwapchain()
 	drawImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
 
 	m_drawImage = CreateImage(this, drawImageExtent, VK_FORMAT_R16G16B16A16_SFLOAT, drawImageUsages, false, "DrawImage");
+
+	DescriptorWriter writer;
+	writer.WriteImage(0, m_drawImage.m_imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+	writer.UpdateSet(m_device, m_drawImageDescriptors);
 }
 
 SwapChainSupportDetails HardwareRenderer::QuerySwapChainSupport(VkPhysicalDevice device)
@@ -293,10 +297,6 @@ void HardwareRenderer::InitializeDescriptors()
 
 	m_drawImageDescriptors = m_globalDescriptorAllocator.Allocate(m_device, m_drawImageDescriptorLayout);
 
-	DescriptorWriter writer;
-	writer.WriteImage(0, m_drawImage.m_imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-	writer.UpdateSet(m_device, m_drawImageDescriptors);
-
 	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
 		std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frameSizes =
@@ -361,12 +361,6 @@ void HardwareRenderer::InitializePipelines()
 
 void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
 {
-	GradientPushConstants constants;
-	constants.m_bottomLeftColour = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
-	constants.m_topRightColour = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
-	constants.m_bottomRightColour = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-	constants.m_topRightColour = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
-
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipeline);
 	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipelineLayout, 0, 1, &m_drawImageDescriptors, 0, nullptr);
 
@@ -491,6 +485,7 @@ void HardwareRenderer::MainLoop()
 				m_bRun = false;
 		}
 
+		m_pWindow->CheckScreenSizeForUpdate(this);
 		RenderFrame();
 	}
 }
