@@ -575,6 +575,7 @@ void HardwareRenderer::MainLoop()
 		m_pWindow->CheckScreenSizeForUpdate(this);
 		RenderFrame();
 
+		m_inputManager.ClearFrameInputs();
 		m_performanceStats.EndPerformanceMeasurement("Frame");
 		m_performanceStats.UpdatePerformanceStats();
 	}
