@@ -622,8 +622,8 @@ void HardwareRenderer::MainLoop()
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
 			ImGui::DragFloat("Field of View", &m_camera.cameraFov, 0.1f, 1.0f, 179.0f);
-			//ImGui::DragFloat("Focus Distance", &m_camera.focusDistance, 0.1f, 0.1f, 1000.0f);
-			//ImGui::DragFloat("Defocus Angle", &m_camera.defocusAngle, 0.1f, 0.0f, 90.0f);
+			ImGui::DragFloat("Focus Distance", &m_camera.focusDistance, 0.1f, 0.1f, 1000.0f);
+			ImGui::DragFloat("Defocus Angle", &m_camera.defocusAngle, 0.1f, 0.0f, 90.0f);
 
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 			ImGui::SeparatorText("Render Settings");

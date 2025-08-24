@@ -1,7 +1,7 @@
 #ifndef Random
 #define Random
 
-float RandomSeed(out uint seed)
+float RandomSeed(inout uint seed)
 {
     seed = (seed ^ 61) ^ (seed >> 16);
     seed *= 9;
@@ -12,13 +12,13 @@ float RandomSeed(out uint seed)
 }
 
 // Generates a random integer in [min, max]
-int RandomIntInRange(int min, int max, out uint seed)
+int RandomIntInRange(int min, int max, inout uint seed)
 {
     return min + int(RandomSeed(seed) * float(max - min + 1));
 }
 
 // Generates a random float in [min, max]
-float RandomFloatInRange(float min, float max, out uint seed)
+float RandomFloatInRange(float min, float max, inout uint seed)
 {
     return mix(min, max, RandomSeed(seed));
 }
@@ -37,14 +37,14 @@ uint SeedFromCoords(uint x, uint y)
     return seed;
 }
 
-vec3 SampleSquare(out uint seed) 
+vec3 SampleSquare(inout uint seed) 
 {
     float x = RandomFloatInRange(0.0, 1.0, seed);
     float y = RandomFloatInRange(0.0, 1.0, seed);
     return vec3(x - 0.5, y - 0.5, 0.0);
 }
 
-vec3 RandomInUnitDisk(out uint seed)
+vec3 RandomInUnitDisk(inout uint seed)
 {
 	while (true)
 	{

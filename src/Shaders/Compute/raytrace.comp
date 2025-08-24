@@ -178,12 +178,13 @@ Ray GetRay(ivec2 pixelCoord, uint seed)
 void main() 
 {
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 localCoord = ivec2(gl_LocalInvocationID.xy);
     ivec2 size = imageSize(image);
 
     if (texelCoord.x < size.x && texelCoord.y < size.y)
     {
         vec4 colour = vec4(0, 0, 0, 1);
-        uint seed = SeedFromCoords(texelCoord.x, texelCoord.y);
+        uint seed = SeedFromCoords(texelCoord.x + localCoord.x, texelCoord.y +  localCoord.y);
 
         for (int i = 0; i < PushConstants.raysPerPixel; i++)
         {
