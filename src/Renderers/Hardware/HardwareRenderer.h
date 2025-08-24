@@ -4,6 +4,14 @@
 #include <functional>
 #include <mutex>
 
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/ext.hpp>
+#include <glm/gtx/hash.hpp>
+
 #include "Vulkan/VulkanTypes.h"
 #include "Vulkan/VulkanDescriptors.h"
 #include "Window.h"
@@ -50,6 +58,18 @@ struct SwapChainSupportDetails
 	VkSurfaceCapabilitiesKHR capabilities;
 	std::vector<VkSurfaceFormatKHR> formats;
 	std::vector<VkPresentModeKHR> presentModes;
+};
+
+struct CameraSettings
+{
+	glm::vec3 cameraPosition = glm::vec3(0, 0, 0);
+	glm::vec3 cameraLookDirection = glm::vec3(0,0,-1);
+	float cameraFov = 90.0f;
+	float focusDistance = 10.0f;
+	float defocusAngle = 0.0;
+
+	glm::vec3 defocusDiskU;
+	glm::vec3 defocusDiskV;
 };
 
 class HardwareRenderer
@@ -110,6 +130,7 @@ private:
 
 	ImGuiContext* m_imguiContext;
 
+	CameraSettings m_camera;
 	RaytracePushConstants m_pushConstants;
 
 	VkPipeline m_raytracePipeline;

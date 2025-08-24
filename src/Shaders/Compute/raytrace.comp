@@ -1,6 +1,24 @@
 #version 450
+
 layout (local_size_x = 16, local_size_y = 16) in;
-layout(rgba16f,set = 0, binding = 0) uniform image2D image;
+layout(rgba16f, set = 0, binding = 0) uniform image2D image;
+
+struct Ray
+{
+    vec3 origin;
+    vec3 direction;
+};
+
+struct Interval
+{
+    float min;
+    float max;
+};
+
+bool IntervalSurrounds(Interval interval, float value)
+{
+    return value >= interval.min && value <= interval.max;
+}
 
 struct Sphere
 {
@@ -9,15 +27,76 @@ struct Sphere
     vec3 colour;
 };
 
-layout( push_constant ) uniform constants
+layout(push_constant) uniform constants
 {	
-    vec3 cameraPosition;
-    vec3 cameraLookDirection;
-    float cameraFov;
-
+    vec3 pixel00Location;
     int raysPerPixel;
+
+    vec3 pixelDeltaU;
     int maxBounces;
+
+    vec3 pixelDeltaV;
+    vec3 cameraPosition;
 } PushConstants;
+
+bool IntersectSphere(Ray ray, Sphere sphere, Interval t)
+{
+	vec3 oc = sphere.center - ray.origin;
+	float a = length(ray.direction)*length(ray.direction);
+	float h = dot(ray.direction, oc);
+	float c = (length(oc)*length(oc)) - sphere.radius * sphere.radius;
+	float discriminant = h * h - a * c;
+	if (discriminant < 0)
+		return false;
+
+	float sqrtDiscriminant = sqrt(discriminant);
+	float root = (h - sqrtDiscriminant) / a;
+	if (!IntervalSurrounds(t, root))
+	{
+		root = (h + sqrtDiscriminant) / a;
+		if (!IntervalSurrounds(t, root))
+			return false;
+	}
+
+	/*rec.t = root;
+	rec.p = r.PointAtT(rec.t);
+	Vector3 outwardNormal = (rec.p - center) / radius;
+	rec.SetFaceNormal(r, outwardNormal);
+	GetSphereUV(outwardNormal, rec.u, rec.v);
+	rec.mat = mat;*/
+
+	return true;
+}
+
+vec3 Raytrace(Ray ray)
+{
+    Sphere testSphere;
+    testSphere.center = vec3(0,0,-5);
+    testSphere.radius = 1.0;
+    testSphere.colour = vec3(1,0,0);
+
+    Sphere groundSphere;
+    groundSphere.center = vec3(0,-1001,-5);
+    groundSphere.radius = 1000.0;
+    groundSphere.colour = vec3(0.5,0.5,0.5);
+
+    Sphere spheres[2] = Sphere[2](testSphere, groundSphere);
+
+    Interval t;
+    t.min = 0.001;
+    t.max = 100000;
+
+    for(int i = 0; i < 2; i++)
+    {
+        float closestSoFar = t.max;
+        if(IntersectSphere(ray, spheres[i], t))
+        {
+            return spheres[i].colour;
+        }
+    }
+
+    return vec3(0.0);
+}
 
 void main() 
 {
@@ -25,7 +104,20 @@ void main()
 	ivec2 size = imageSize(image);
     if(texelCoord.x < size.x && texelCoord.y < size.y)
     {
-        vec4 colour = vec4(float(texelCoord.x) / float(size.x), float(texelCoord.y) / float(size.y), 0.5, 1.0);
+        vec4 colour = vec4(0,0,0,1);
+        for(int i = 0; i < PushConstants.raysPerPixel; i++)
+        {
+			vec3 pixelLocation = PushConstants.pixel00Location + (texelCoord.x * PushConstants.pixelDeltaU) + (texelCoord.y * PushConstants.pixelDeltaV);
+			vec3 rayDirection = pixelLocation - PushConstants.cameraPosition;
+
+			Ray ray;
+            ray.origin = PushConstants.cameraPosition;
+            ray.direction = normalize(rayDirection);
+
+            colour.rgb += Raytrace(ray);
+        }
+        colour.rgb /= float(PushConstants.raysPerPixel);
+
         imageStore(image, texelCoord, colour);
     }   
 }

@@ -435,6 +435,35 @@ void HardwareRenderer::Quit()
 
 void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
 {
+	float pixelSampleScale = 1.0f / static_cast<float>(m_pushConstants.raysPerPixel);
+	auto theta = glm::radians(m_camera.cameraFov);
+	auto h = std::tan(theta / 2.0);
+	float viewportHeight = 2 * h * m_camera.focusDistance;
+	float viewportWidth = viewportHeight * (double(m_drawExtent.width) / m_drawExtent.height);
+
+	glm::vec3 up = glm::vec3(0, 1, 0);
+	glm::vec3 w = glm::normalize(-m_camera.cameraLookDirection);
+	glm::vec3 u = glm::normalize(glm::cross(up, w));
+	glm::vec3 v = glm::cross(w, u);
+
+	auto viewportU = viewportWidth * u;
+	auto viewportV = viewportHeight * -v;
+
+	glm::vec3 pixelDeltaU = viewportU / static_cast<float>(m_drawExtent.width);
+	glm::vec3 pixelDeltaV = viewportV / static_cast<float>(m_drawExtent.height);
+
+	auto viewportUpperLeft = m_camera.cameraPosition - (m_camera.focusDistance * w) - viewportU / 2.0f - viewportV / 2.0f;
+	glm::vec3 pixel00Location = viewportUpperLeft + 0.5 * (pixelDeltaU + pixelDeltaV);
+
+	auto defocusRadius = m_camera.focusDistance * std::tan(glm::radians(m_camera.defocusAngle / 2.0));
+	m_camera.defocusDiskU = defocusRadius * u;
+	m_camera.defocusDiskV = defocusRadius * v;
+
+	m_pushConstants.pixel00Location = pixel00Location;
+	m_pushConstants.pixelDeltaU = pixelDeltaU;
+	m_pushConstants.pixelDeltaV = pixelDeltaV;
+	m_pushConstants.cameraPosition = m_camera.cameraPosition;
+
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipeline);
 	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipelineLayout, 0, 1, &m_drawImageDescriptors, 0, nullptr);
 
@@ -585,15 +614,15 @@ void HardwareRenderer::MainLoop()
 			ImGui::SeparatorText("Camera Settings");
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
-			static float cameraPosition[3]{ 0, 0, -5 };
+			static float cameraPosition[3]{ m_camera.cameraPosition.x, m_camera.cameraPosition.y, m_camera.cameraPosition.z };
 			ImGui::DragFloat3("Camera Position", cameraPosition, 0.1f);
-			m_pushConstants.cameraPosition = glm::vec3(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+			m_camera.cameraPosition = glm::vec3(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
 
-			static float cameraLookAt[3]{ 0, 0, 0 };
+			static float cameraLookAt[3]{ m_camera.cameraLookDirection.x, m_camera.cameraLookDirection.y, m_camera.cameraLookDirection.z };
 			ImGui::DragFloat3("Camera Look Direction", cameraLookAt, 0.1f);
-			m_pushConstants.cameraLookDirection = glm::normalize(glm::vec3(cameraLookAt[0], cameraLookAt[1], cameraLookAt[2]));
+			m_camera.cameraLookDirection = glm::normalize(glm::vec3(cameraLookAt[0], cameraLookAt[1], cameraLookAt[2]));
 
-			ImGui::DragFloat("Field of View", &m_pushConstants.cameraFov, 0.1f, 1.0f, 179.0f);
+			ImGui::DragFloat("Field of View", &m_camera.cameraFov, 0.1f, 1.0f, 179.0f);
 
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 			ImGui::SeparatorText("Render Settings");
@@ -601,6 +630,15 @@ void HardwareRenderer::MainLoop()
 
 			ImGui::DragInt("Rays Per Pixel", &m_pushConstants.raysPerPixel, 1, 1, 100);
 			ImGui::DragInt("Max Bounces", &m_pushConstants.maxBounces, 1, 1, 100);
+
+			ImGui::End();
+		}
+
+		{
+			ImGui::Begin("Performance Stats", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+			
+			ImGui::Text("Frame Time: %.2f ms", m_performanceStats.GetPerformanceMeasurement("Frame")->GetPerformanceMeasurementInMilliseconds());
+			ImGui::Text("FPS: %.1f", m_performanceStats.GetAvgFPS());
 
 			ImGui::End();
 		}

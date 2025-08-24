@@ -98,9 +98,15 @@ struct GPUDrawPushConstants
 
 struct RaytracePushConstants
 {
-    glm::vec3 cameraPosition;
-    glm::vec3 cameraLookDirection;
-    float cameraFov = 90.0f;
-	int raysPerPixel = 3;
-	int maxBounces = 1;
+	glm::vec3 pixel00Location;
+    int raysPerPixel = 1;
+
+	glm::vec3 pixelDeltaU;
+    int maxBounces = 1;
+
+	glm::vec3 pixelDeltaV;
+    float padding3;
+
+	glm::vec3 cameraPosition;
+    float padding4;
 };
