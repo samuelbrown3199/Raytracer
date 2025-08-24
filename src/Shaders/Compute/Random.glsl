@@ -54,4 +54,29 @@ vec3 RandomInUnitDisk(inout uint seed)
 	}
 }
 
+vec3 RandomVector(inout uint seed)
+{
+    return vec3(RandomFloatInRange(-1.0, 1.0, seed), RandomFloatInRange(-1.0, 1.0, seed), RandomFloatInRange(-1.0, 1.0, seed));
+}
+
+vec3 RandomUnitVector(inout uint seed)
+{
+	while (true)
+	{
+		vec3 p = RandomVector(seed);
+		float lensq = length(p) * length(p);
+		if (1e-160 < lensq && lensq <= 1.0)
+			return p / sqrt(lensq);
+	}
+}
+
+vec3 RandomOnHemisphere(vec3 normal, inout uint seed)
+{
+	vec3 onUnitSphere = RandomUnitVector(seed);
+	if (dot(onUnitSphere, normal) > 0.0)
+		return onUnitSphere;
+	else
+		return -onUnitSphere;
+}
+
 #endif

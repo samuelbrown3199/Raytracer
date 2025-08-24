@@ -13,11 +13,17 @@ struct Ray
     vec3 direction;
 };
 
+struct Material
+{
+    vec3 colour;
+    float smoothness;
+};
+
 struct RayHit
 {
     vec3 point;
     vec3 normal;
-    vec3 colour;
+    Material mat;
     float t;
     bool frontFace;
 };
@@ -92,7 +98,7 @@ bool IntersectSphere(Ray ray, Sphere sphere, Interval t, out RayHit rec)
 	rec.point = PointAtT(rec.t, ray);
 	vec3 outwardNormal = (rec.point - sphere.center) / sphere.radius;
     rec.normal = outwardNormal;
-    rec.colour = sphere.colour;
+    rec.mat.colour = sphere.colour;
 
 	return true;
 }
@@ -112,14 +118,13 @@ vec3 GetEnvironmentColour(Ray ray)
     return (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
 }
 
-vec3 Raytrace(Ray ray)
+vec3 Raytrace(Ray ray, inout RayHit rec)
 {
     Interval t;
     t.min = 0.001;
     t.max = 100000;
 
     float closestSoFar = t.max;
-    RayHit rec;
 
     bool hitObject = false;
     for(int i = 0; i < PushConstants.sphereCount; i++)
@@ -136,7 +141,7 @@ vec3 Raytrace(Ray ray)
 
     vec3 colour = vec3(0.0,0.0,0.0);
     if(hitObject)
-        colour = rec.colour;
+        colour = rec.mat.colour;
     else
         colour = GetEnvironmentColour(ray);
 
@@ -185,7 +190,9 @@ void main()
             float junk = RandomSeed(seed);
 
             Ray ray = GetRay(texelCoord, seed);
-            colour.rgb += Raytrace(ray);
+            RayHit rec;
+
+            colour.rgb += Raytrace(ray, rec);
         }
 
         colour.rgb /= float(PushConstants.raysPerPixel);
