@@ -25,7 +25,7 @@ struct RaytracePushConstants
     int raysPerPixel = 10;
 
 	glm::vec3 pixelDeltaU;
-    int maxBounces = 1;
+    int maxBounces = 3;
 
 	glm::vec3 pixelDeltaV;
     float defocusAngle;
@@ -34,10 +34,10 @@ struct RaytracePushConstants
     int sphereCount;
 
 	glm::vec3 defocusDiskU;
-	float padding5;
+	int renderMode;
 
 	glm::vec3 defocusDiskV;
-    float padding6;
+    int frame;
 };
 
 struct GPUSphere

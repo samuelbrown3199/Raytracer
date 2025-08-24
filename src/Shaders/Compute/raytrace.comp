@@ -26,6 +26,7 @@ struct RayHit
     Material mat;
     float t;
     bool frontFace;
+    bool hitObject;
 };
 
 vec3 PointAtT(float t, Ray ray)
@@ -71,7 +72,10 @@ layout(push_constant) uniform constants
     int sphereCount;
 
     vec3 defocusU;
+    int renderMode;
+
     vec3 defocusV;
+    int frame;
 
 } PushConstants;
 
@@ -103,6 +107,36 @@ bool IntersectSphere(Ray ray, Sphere sphere, Interval t, out RayHit rec)
 	return true;
 }
 
+bool NearZero(vec3 v)
+{
+    const float s = 1e-8;
+    return (abs(v.x) < s) && (abs(v.y) < s) && (abs(v.z) < s);
+}
+
+bool MaterialScatter(Ray rayIn, RayHit rec, out vec3 attenuation, out Ray scattered, uint seed)
+{
+    float scatterOrReflect = RandomFloatInRange(0, 1, seed);
+    if(scatterOrReflect < rec.mat.smoothness)
+    {
+        vec3 reflected = reflect(normalize(rayIn.direction), rec.normal);
+        scattered.origin = rec.point;
+        scattered.direction = reflected;
+        attenuation = rec.mat.colour;
+    }
+    else
+    {
+        vec3 scatterDirection = rec.normal + RandomUnitVector(seed);
+        if(NearZero(scatterDirection))
+            scatterDirection = rec.normal;
+
+        scattered.origin = rec.point;
+        scattered.direction = scatterDirection;
+        attenuation = rec.mat.colour;
+    }
+
+    return true;
+}
+
 float LinearToGamma(float linearComponent)
 {
     if(linearComponent > 0)
@@ -116,40 +150,6 @@ vec3 GetEnvironmentColour(Ray ray)
     vec3 unitDirection = normalize(ray.direction);
     float t = 0.5 * (unitDirection.y + 1.0);
     return (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
-}
-
-vec3 Raytrace(Ray ray, inout RayHit rec)
-{
-    Interval t;
-    t.min = 0.001;
-    t.max = 100000;
-
-    float closestSoFar = t.max;
-
-    bool hitObject = false;
-    for(int i = 0; i < PushConstants.sphereCount; i++)
-    {
-        Interval newInterval;
-        newInterval.min = t.min;
-        newInterval.max = closestSoFar;
-        if(IntersectSphere(ray, spheres[i], newInterval, rec))
-        {
-            closestSoFar = rec.t;
-            hitObject = true;
-        }
-    }
-
-    vec3 colour = vec3(0.0,0.0,0.0);
-    if(hitObject)
-        colour = rec.mat.colour;
-    else
-        colour = GetEnvironmentColour(ray);
-
-    colour[0] = LinearToGamma(colour[0]);
-    colour[1] = LinearToGamma(colour[1]);
-    colour[2] = LinearToGamma(colour[2]);
-
-    return colour;
 }
 
 vec3 DefocusDiskSample(uint seed)
@@ -174,6 +174,54 @@ Ray GetRay(ivec2 pixelCoord, uint seed)
     return ray;
 }
 
+vec3 RayColour(Ray ray, inout RayHit rec, inout uint seed)
+{
+    vec3 result = vec3(0.0);
+    vec3 throughput = vec3(1.0);
+
+    for (int bounce = 0; bounce < PushConstants.maxBounces; bounce++)
+    {
+        Interval t; t.min = 0.001; t.max = 100000.0;
+        float closestSoFar = t.max;
+        bool hitObject = false;
+
+        for (int i = 0; i < PushConstants.sphereCount; i++)
+        {
+            Interval newInterval; newInterval.min = t.min; newInterval.max = closestSoFar;
+            if (IntersectSphere(ray, spheres[i], newInterval, rec))
+            {
+                closestSoFar = rec.t;
+                hitObject = true;
+            }
+        }
+
+        if (!hitObject)
+        {
+            vec3 bg = GetEnvironmentColour(ray);
+            result += throughput * bg;
+            break;
+        }
+        
+        //TODO: Emission
+        // vec3 emitted = rec.mat.emission; // example
+        // result += throughput * emitted;
+
+        // Scatter
+        Ray scattered;
+        vec3 attenuation;
+        if (!MaterialScatter(ray, rec, attenuation, scattered, seed))
+        {
+            // absorbed: terminate
+            break;
+        }
+
+        throughput *= attenuation;
+        ray = scattered;
+    }
+
+    return result;
+}
+
 void main() 
 {
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
@@ -182,8 +230,11 @@ void main()
 
     if (texelCoord.x < size.x && texelCoord.y < size.y)
     {
-        vec4 colour = vec4(0, 0, 0, 1);
-        uint seed = SeedFromCoords(texelCoord.x + localCoord.x, texelCoord.y +  localCoord.y);
+        vec4 colour = vec4(0,0,0,1);
+
+        uint seed = PushConstants.frame;
+        RandomSeed(seed);
+        seed = SeedFromCoords(texelCoord.x + localCoord.x, texelCoord.y +  localCoord.y);
 
         for (int i = 0; i < PushConstants.raysPerPixel; i++)
         {
@@ -192,10 +243,13 @@ void main()
             Ray ray = GetRay(texelCoord, seed);
             RayHit rec;
 
-            colour.rgb += Raytrace(ray, rec);
+            colour.rgb += RayColour(ray, rec, seed);
         }
-
         colour.rgb /= float(PushConstants.raysPerPixel);
+
+        colour[0] = LinearToGamma(colour[0]);
+        colour[1] = LinearToGamma(colour[1]);
+        colour[2] = LinearToGamma(colour[2]);
 
         imageStore(image, texelCoord, colour);
     }   

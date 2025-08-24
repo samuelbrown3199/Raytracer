@@ -707,6 +707,10 @@ void HardwareRenderer::MainLoop()
 			ImGui::DragInt("Rays Per Pixel", &m_pushConstants.raysPerPixel, 1, 1, 100);
 			ImGui::DragInt("Max Bounces", &m_pushConstants.maxBounces, 1, 1, 100);
 
+			//static bool accumulated = false;
+			//ImGui::Checkbox("Accumulate Frames", &accumulated);
+			//m_pushConstants.renderMode = accumulated;
+
 			ImGui::End();
 		}
 
@@ -721,6 +725,8 @@ void HardwareRenderer::MainLoop()
 
 		m_pWindow->CheckScreenSizeForUpdate(this);
 		RenderFrame();
+
+		m_pushConstants.frame++;
 
 		m_inputManager.ClearFrameInputs();
 		m_performanceStats.EndPerformanceMeasurement("Frame");

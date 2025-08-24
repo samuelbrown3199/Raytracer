@@ -63,7 +63,7 @@ struct SwapChainSupportDetails
 
 struct CameraSettings
 {
-	glm::vec3 cameraPosition = glm::vec3(0, 0, 0);
+	glm::vec3 cameraPosition = glm::vec3(0, 5, 0);
 	glm::vec3 cameraLookDirection = glm::vec3(0,0,-1);
 	float cameraFov = 90.0f;
 	float focusDistance = 10.0f;
