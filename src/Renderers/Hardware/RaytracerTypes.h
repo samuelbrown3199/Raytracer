@@ -38,14 +38,22 @@ struct RaytracePushConstants
 
 	glm::vec3 defocusDiskV;
     int frame;
+
+	glm::vec3 sunDirection = glm::vec3(-0.5, -1.0, -0.3);
+	float sunIntensity = 5.0f;
+
+	glm::vec3 sunColour = glm::vec3(1.0, 0.95, 0.85);
+	float padding;
 };
 
 struct GPUSphere
 {
 	glm::vec3 center;
 	float radius;
-	glm::vec3 colour;
+	int materialIndex;
 	float padding;
+	float padding2;
+	float padding3;
 };
 
 struct GPUMaterial

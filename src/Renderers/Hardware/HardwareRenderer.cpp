@@ -307,11 +307,12 @@ void HardwareRenderer::InitializeDescriptors()
 	{
 		DescriptorLayoutBuilder builder;
 		builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
-		m_sceneSphereDescriptorLayout = builder.Build(m_device);
+		builder.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+		m_sceneDescriptorLayout = builder.Build(m_device);
 	}
 
 	m_drawImageDescriptors = m_globalDescriptorAllocator.Allocate(m_device, m_drawImageDescriptorLayout);
-	m_sceneSphereDescriptor = m_globalDescriptorAllocator.Allocate(m_device, m_sceneSphereDescriptorLayout);
+	m_sceneDescriptor = m_globalDescriptorAllocator.Allocate(m_device, m_sceneDescriptorLayout);
 
 	for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
@@ -413,7 +414,7 @@ void HardwareRenderer::InitializePipelines()
 	{
 		std::vector<VkDescriptorSetLayout> layouts;
 		layouts.push_back(m_drawImageDescriptorLayout);
-		layouts.push_back(m_sceneSphereDescriptorLayout);
+		layouts.push_back(m_sceneDescriptorLayout);
 
 		VkPushConstantRange pushConstant = VkPushConstantRange(VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(RaytracePushConstants));
 		std::vector<VkPushConstantRange> pushConstants;
@@ -448,46 +449,77 @@ void HardwareRenderer::Quit()
 
 void HardwareRenderer::InitializeScene()
 {
-	GPUSphere groundSphere;
-	groundSphere.center = glm::vec3(0, -1000, -5);
-	groundSphere.radius = 1000.0;
-	groundSphere.colour = glm::vec3(0.5, 0.5, 0.5);
-
 	for (int i = -5; i < 5; ++i)
 	{
 		for (int j = -5; j < 5; ++j)
 		{
-			glm::vec3 center(i + 0.9 * RandomDouble(), 0.2, j + 0.9 * RandomDouble());
+			glm::vec3 center(i + 0.9 * RandomDouble(), 0.22, j + 0.9 * RandomDouble());
 
-			if ((center - glm::vec3(4, 0.2, 0)).length() > 0.9)
+			if ((center - glm::vec3(4, 0.22, 0)).length() > 1.2)
 			{
 				glm::vec3 albedo = glm::vec3(RandomDouble(), RandomDouble(), RandomDouble());
+				GPUMaterial newMaterial;
+				newMaterial.albedo = albedo;
+				
+				float reflectChance = RandomDouble();
+				if (reflectChance < 0.85f)
+					newMaterial.smoothness = 0.0f;
+				else
+					newMaterial.smoothness = RandomDouble();
+
+				int newMaterialIndex = m_sceneMaterials.size();
+				m_sceneMaterials.push_back(newMaterial);
+
 				GPUSphere newSphere;
 
 				newSphere.center = center;
 				newSphere.radius = 0.2;
-				newSphere.colour = albedo;
+				newSphere.materialIndex = newMaterialIndex;
 
 				m_sceneSpheres.push_back(newSphere);
 			}
 		}
 	}
 
+	GPUMaterial groundMaterial;
+	groundMaterial.albedo = glm::vec3(0.5, 0.5, 0.5);
+	groundMaterial.smoothness = 0.0;
+	m_sceneMaterials.push_back(groundMaterial);
+
+	GPUSphere groundSphere;
+	groundSphere.center = glm::vec3(0, -1000, -5);
+	groundSphere.radius = 1000.0;
+	groundSphere.materialIndex = m_sceneMaterials.size() - 1;
+	m_sceneSpheres.push_back(groundSphere);
+
+	GPUMaterial glassMaterial;
+	glassMaterial.albedo = glm::vec3(1.0, 1.0, 1.0);
+	glassMaterial.smoothness = 0.0;
+	m_sceneMaterials.push_back(glassMaterial);
+
 	GPUSphere testSphere;
 	testSphere.center = glm::vec3(0, 1, 0);
 	testSphere.radius = 1.0;
-	testSphere.colour = glm::vec3(1.0, 1.0, 1.0);
+	testSphere.materialIndex = m_sceneMaterials.size() - 1;
 	m_sceneSpheres.push_back(testSphere);
+
+	GPUMaterial diffuseMaterial1;
+	diffuseMaterial1.albedo = glm::vec3(0.4, 0.2, 0.1);
+	diffuseMaterial1.smoothness = 0.0;
+	m_sceneMaterials.push_back(diffuseMaterial1);
 
 	testSphere.center = glm::vec3(-4, 1, 0);
-	testSphere.colour = glm::vec3(0.4, 0.2, 0.1);
+	testSphere.materialIndex = m_sceneMaterials.size() - 1;
 	m_sceneSpheres.push_back(testSphere);
+
+	GPUMaterial reflectiveMaterial;
+	reflectiveMaterial.albedo = glm::vec3(0.7, 0.6, 0.5);
+	reflectiveMaterial.smoothness = 1.0;
+	m_sceneMaterials.push_back(reflectiveMaterial);
 
 	testSphere.center = glm::vec3(4, 1, 0);
-	testSphere.colour = glm::vec3(0.7, 0.6, 0.5);
+	testSphere.materialIndex = m_sceneMaterials.size() - 1;
 	m_sceneSpheres.push_back(testSphere);
-
-	m_sceneSpheres.push_back(groundSphere);
 
 	BufferSceneData();
 }
@@ -500,9 +532,15 @@ void HardwareRenderer::BufferSceneData()
 	memcpy(data, m_sceneSpheres.data(), sizeof(GPUSphere) * m_sceneSpheres.size());
 	vmaUnmapMemory(m_allocator, m_sceneSphereBuffer.m_allocation);
 
+	m_sceneMaterialBuffer = CreateBuffer(sizeof(GPUMaterial) * m_sceneMaterials.size(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneMaterialBuffer");
+	vmaMapMemory(m_allocator, m_sceneMaterialBuffer.m_allocation, &data);
+	memcpy(data, m_sceneMaterials.data(), sizeof(GPUMaterial) * m_sceneMaterials.size());
+	vmaUnmapMemory(m_allocator, m_sceneMaterialBuffer.m_allocation);
+
 	DescriptorWriter writer;
 	writer.WriteBuffer(0, m_sceneSphereBuffer.m_buffer, sizeof(GPUSphere) * m_sceneSpheres.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-	writer.UpdateSet(m_device, m_sceneSphereDescriptor);
+	writer.WriteBuffer(1, m_sceneMaterialBuffer.m_buffer, sizeof(GPUMaterial) * m_sceneMaterials.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.UpdateSet(m_device, m_sceneDescriptor);
 }
 
 void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
@@ -540,7 +578,7 @@ void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
 
 	std::vector<VkDescriptorSet> sets;
 	sets.push_back(m_drawImageDescriptors);
-	sets.push_back(m_sceneSphereDescriptor);
+	sets.push_back(m_sceneDescriptor);
 
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipeline);
 	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_raytracePipelineLayout, 0, sets.size(), sets.data(), 0, nullptr);
@@ -690,6 +728,7 @@ void HardwareRenderer::MainLoop()
 
 		cameraController.Update(this);
 
+		if(!cameraController.m_bLockedMouse)
 		{
 			ImGui::Begin("Raytracer Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
@@ -706,6 +745,18 @@ void HardwareRenderer::MainLoop()
 
 			ImGui::DragInt("Rays Per Pixel", &m_pushConstants.raysPerPixel, 1, 1, 100);
 			ImGui::DragInt("Max Bounces", &m_pushConstants.maxBounces, 1, 1, 100);
+
+			ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
+			static float sunlightColour[3] = { m_pushConstants.sunColour[0], m_pushConstants.sunColour[1], m_pushConstants.sunColour[2] };
+			ImGui::DragFloat3("Sunlight Colour", sunlightColour, 0.01f, 0.0f, 1.0f);
+			m_pushConstants.sunColour = glm::vec3(sunlightColour[0], sunlightColour[1], sunlightColour[2]);
+
+			static float sunlightDirection[3] = { m_pushConstants.sunDirection[0], m_pushConstants.sunDirection[1], m_pushConstants.sunDirection[2] };
+			ImGui::DragFloat3("Sunlight Direction", sunlightDirection, 0.01f, -1.0f, 1.0f);
+			m_pushConstants.sunDirection = glm::normalize(glm::vec3(sunlightDirection[0], sunlightDirection[1], sunlightDirection[2]));
+
+			ImGui::DragFloat("Sunlight Intensity", &m_pushConstants.sunIntensity, 0.01f, 0.0f, 10.0f);
 
 			//static bool accumulated = false;
 			//ImGui::Checkbox("Accumulate Frames", &accumulated);

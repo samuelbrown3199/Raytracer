@@ -140,8 +140,12 @@ private:
 
 	std::vector<GPUSphere> m_sceneSpheres;
 	AllocatedBuffer m_sceneSphereBuffer;
-	VkDescriptorSet m_sceneSphereDescriptor;
-	VkDescriptorSetLayout m_sceneSphereDescriptorLayout;
+
+	std::vector<GPUMaterial> m_sceneMaterials;
+	AllocatedBuffer m_sceneMaterialBuffer;
+
+	VkDescriptorSet m_sceneDescriptor;
+	VkDescriptorSetLayout m_sceneDescriptorLayout;
 
 	void InitializeVulkan();
 	void CreateInstance();

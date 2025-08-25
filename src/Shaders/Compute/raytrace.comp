@@ -23,7 +23,7 @@ struct RayHit
 {
     vec3 point;
     vec3 normal;
-    Material mat;
+    int matIndex;
     float t;
     bool frontFace;
     bool hitObject;
@@ -49,12 +49,17 @@ struct Sphere
 {
     vec3 center;
     float radius;
-    vec3 colour;
+    int materialIndex;
 };
 
 layout(set=1, binding=0) readonly buffer SphereBuffer
 {
 	Sphere spheres[];
+};
+
+layout(set=1, binding=1) readonly buffer MaterialBuffer
+{
+    Material materials[];
 };
 
 layout(push_constant) uniform constants
@@ -76,6 +81,11 @@ layout(push_constant) uniform constants
 
     vec3 defocusV;
     int frame;
+
+    vec3 sunDir;
+    float sunStrength;
+
+    vec3 sunColour;
 
 } PushConstants;
 
@@ -102,7 +112,7 @@ bool IntersectSphere(Ray ray, Sphere sphere, Interval t, out RayHit rec)
 	rec.point = PointAtT(rec.t, ray);
 	vec3 outwardNormal = (rec.point - sphere.center) / sphere.radius;
     rec.normal = outwardNormal;
-    rec.mat.colour = sphere.colour;
+    rec.matIndex = sphere.materialIndex;
 
 	return true;
 }
@@ -113,15 +123,29 @@ bool NearZero(vec3 v)
     return (abs(v.x) < s) && (abs(v.y) < s) && (abs(v.z) < s);
 }
 
+bool AnyHit(Ray r, float tMin, float tMax)
+{
+    Interval t; t.min = tMin; t.max = tMax;
+    RayHit rec;
+    for (int i = 0; i < PushConstants.sphereCount; i++)
+    {
+        if (IntersectSphere(r, spheres[i], t, rec))
+            return true;
+    }
+    return false;
+}
+
 bool MaterialScatter(Ray rayIn, RayHit rec, out vec3 attenuation, out Ray scattered, uint seed)
 {
     float scatterOrReflect = RandomFloatInRange(0, 1, seed);
-    if(scatterOrReflect < rec.mat.smoothness)
+    Material targetMat = materials[rec.matIndex];
+
+    if(scatterOrReflect < targetMat.smoothness)
     {
         vec3 reflected = reflect(normalize(rayIn.direction), rec.normal);
         scattered.origin = rec.point;
         scattered.direction = reflected;
-        attenuation = rec.mat.colour;
+        attenuation = targetMat.colour;
     }
     else
     {
@@ -131,7 +155,7 @@ bool MaterialScatter(Ray rayIn, RayHit rec, out vec3 attenuation, out Ray scatte
 
         scattered.origin = rec.point;
         scattered.direction = scatterDirection;
-        attenuation = rec.mat.colour;
+        attenuation = targetMat.colour;
     }
 
     return true;
@@ -147,9 +171,49 @@ float LinearToGamma(float linearComponent)
 
 vec3 GetEnvironmentColour(Ray ray)
 {
-    vec3 unitDirection = normalize(ray.direction);
-    float t = 0.5 * (unitDirection.y + 1.0);
-    return (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
+    vec3 unitDir = normalize(ray.direction);
+    vec3 sunDir  = normalize(PushConstants.sunDir);
+    float sunDotUp = dot(-sunDir, vec3(0,1,0)); // how high the sun is (1=zenith, 0=horizon, <0=below horizon)
+
+    // Base sky colours for different times
+    vec3 dayZenith    = vec3(0.5, 0.7, 1.0);   // bright blue
+    vec3 dayHorizon   = vec3(1.0, 1.0, 1.0);   // whiteish horizon
+    vec3 sunriseColor = vec3(1.0, 0.4, 0.2);   // warm orange
+    vec3 nightZenith  = vec3(0.02, 0.05, 0.2); // deep blue night
+    vec3 nightHorizon = vec3(0.1, 0.1, 0.15);  // dark horizon glow
+
+    // Vertical gradient factor (ray direction, not sun)
+    float viewT = clamp(0.5 * (unitDir.y + 1.0), 0.0, 1.0);
+
+    // ----- Choose base sky depending on sun height -----
+    vec3 baseSky;
+    if (sunDotUp > 0.1)
+    {
+        // Daytime
+        baseSky = mix(dayHorizon, dayZenith, viewT);
+    } 
+    else if (sunDotUp > -0.1) 
+    {
+        // Sunrise/Sunset transition zone
+        float blend = (sunDotUp + 0.1) / 0.2;
+        vec3 daySky   = mix(dayHorizon, dayZenith, viewT);
+        vec3 sunSky   = mix(sunriseColor, sunriseColor * 0.5, viewT);
+        baseSky = mix(sunSky, daySky, blend);
+    } 
+    else
+    {
+        // Night
+        baseSky = mix(nightHorizon, nightZenith, viewT);
+    }
+
+    // ----- Sun glow -----
+    float cosTheta = dot(unitDir, -sunDir); // looking toward sun?
+    cosTheta = clamp(cosTheta, 0.0, 1.0);
+
+    float sunDisk = exp(-pow(acos(cosTheta) / radians(0.5), 2.0));
+    vec3 sunGlow = PushConstants.sunColour * PushConstants.sunStrength * sunDisk;
+
+    return baseSky + sunGlow;
 }
 
 vec3 DefocusDiskSample(uint seed)
@@ -200,6 +264,31 @@ vec3 RayColour(Ray ray, inout RayHit rec, inout uint seed)
             vec3 bg = GetEnvironmentColour(ray);
             result += throughput * bg;
             break;
+        }
+
+        bool addDirectLight = bounce == 0;
+        if(addDirectLight)
+        {
+            float nDotL = max(dot(rec.normal, -PushConstants.sunDir), 0.0);
+            if(nDotL > 0.0)
+            {
+                Ray shadowRay;
+                shadowRay.origin = rec.point + rec.normal * 0.001;
+                shadowRay.direction = -PushConstants.sunDir;
+
+                bool occluded = AnyHit(shadowRay, 0.001, 1e20);
+                if(!occluded)
+                {
+                    vec3 sun = PushConstants.sunStrength * PushConstants.sunColour;
+
+                    const float INV_PI = 0.31830988618;
+                    vec3 direct = sun * (nDotL * INV_PI);
+
+                    Material recMat = materials[rec.matIndex];
+
+                    result += throughput * recMat.colour * direct;
+                }
+            }
         }
         
         //TODO: Emission
