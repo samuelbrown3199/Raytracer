@@ -31,7 +31,7 @@ struct RaytracePushConstants
     float defocusAngle;
 
 	glm::vec3 cameraPosition;
-    int sphereCount;
+    int parentAABBCount;
 
 	glm::vec3 defocusDiskU;
 	int padding2;
@@ -44,6 +44,14 @@ struct RaytracePushConstants
 
 	glm::vec3 sunColour = glm::vec3(1.0, 0.95, 0.85);
 	float padding;
+};
+
+struct GPUAABB
+{
+	glm::vec3 min;
+	int objectType;
+	glm::vec3 max;
+	int objectIndex;
 };
 
 struct GPUSphere
@@ -68,4 +76,14 @@ struct GPUMaterial
 
 	glm::vec3 absorbtion = glm::vec3(0,0,0);
 	float padding3;
+
+	bool operator==(const GPUMaterial& other) const
+	{
+		return (albedo == other.albedo) &&
+			(smoothness == other.smoothness) &&
+			(fuzziness == other.fuzziness) &&
+			(emission == other.emission) &&
+			(refractiveIndex == other.refractiveIndex) &&
+			(absorbtion == other.absorbtion);
+	}
 };

@@ -142,9 +142,11 @@ private:
 	PerformanceStats m_performanceStats;
 	InputManager m_inputManager;
 
+	//Scene Data and buffers
+	std::vector<GPUAABB> m_sceneAABBs;
+	AllocatedBuffer m_sceneAABBBuffer;
 	std::vector<GPUSphere> m_sceneSpheres;
 	AllocatedBuffer m_sceneSphereBuffer;
-
 	std::vector<GPUMaterial> m_sceneMaterials;
 	AllocatedBuffer m_sceneMaterialBuffer;
 
@@ -174,6 +176,9 @@ private:
 		void* pUserData);
 
 	void Quit();
+
+	int GetMaterialIndex(const GPUMaterial& material);
+	void CreateSphere(glm::vec3 center, float radius, GPUMaterial material);
 
 	void RandomSpheresInRange(int minX, int maxX, int minZ, int maxZ);
 	void InitializeScene();

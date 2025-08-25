@@ -313,6 +313,7 @@ void HardwareRenderer::InitializeDescriptors()
 		DescriptorLayoutBuilder builder;
 		builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 		builder.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+		builder.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 		m_sceneDescriptorLayout = builder.Build(m_device);
 	}
 
@@ -452,6 +453,39 @@ void HardwareRenderer::Quit()
 	m_bRun = false;
 }
 
+int HardwareRenderer::GetMaterialIndex(const GPUMaterial& material)
+{
+	for(int i = 0; i < m_sceneMaterials.size(); ++i)
+	{
+		if (m_sceneMaterials[i] == material)
+			return i;
+	}
+
+	return -1;
+}
+
+void HardwareRenderer::CreateSphere(glm::vec3 center, float radius, GPUMaterial material)
+{
+	GPUSphere newSphere;
+	newSphere.center = center;
+	newSphere.radius = radius;
+
+	int materialIndex = GetMaterialIndex(material);
+	if(materialIndex == -1)
+		throw std::exception("Material not found when creating sphere.");
+
+	newSphere.materialIndex = materialIndex;
+
+	GPUAABB newAABB;
+	newAABB.min = center - glm::vec3(radius);
+	newAABB.max = center + glm::vec3(radius);
+	newAABB.objectType = 0;
+	newAABB.objectIndex = m_sceneSpheres.size();
+
+	m_sceneAABBs.push_back(newAABB);
+	m_sceneSpheres.push_back(newSphere);
+}
+
 void HardwareRenderer::RandomSpheresInRange(int minX, int maxX, int minZ, int maxZ)
 {
 	float randomSphereHeight = 0.20f;
@@ -485,13 +519,7 @@ void HardwareRenderer::RandomSpheresInRange(int minX, int maxX, int minZ, int ma
 				int newMaterialIndex = m_sceneMaterials.size();
 				m_sceneMaterials.push_back(newMaterial);
 
-				GPUSphere newSphere;
-
-				newSphere.center = center;
-				newSphere.radius = 0.2;
-				newSphere.materialIndex = newMaterialIndex;
-
-				m_sceneSpheres.push_back(newSphere);
+				CreateSphere(center, 0.2f, newMaterial);
 			}
 		}
 	}
@@ -511,12 +539,6 @@ void HardwareRenderer::InitializeScene()
 	groundMaterial.emission = 0.0f;
 	m_sceneMaterials.push_back(groundMaterial);
 
-	GPUSphere groundSphere;
-	groundSphere.center = glm::vec3(0, -1000, -5);
-	groundSphere.radius = 1000.0;
-	groundSphere.materialIndex = m_sceneMaterials.size() - 1;
-	m_sceneSpheres.push_back(groundSphere);
-
 	GPUMaterial glassMaterial;
 	glassMaterial.albedo = glm::vec3(1.0, 1.0, 1.0);
 	glassMaterial.smoothness = 0.0;
@@ -524,52 +546,48 @@ void HardwareRenderer::InitializeScene()
 	glassMaterial.absorbtion = glm::vec3(0,0,0);
 	m_sceneMaterials.push_back(glassMaterial);
 
-	GPUSphere testSphere;
-	testSphere.center = glm::vec3(0, 1, 0);
-	testSphere.radius = 1.0;
-	testSphere.materialIndex = m_sceneMaterials.size() - 1;
-	m_sceneSpheres.push_back(testSphere);
-
 	GPUMaterial diffuseMaterial1;
 	diffuseMaterial1.albedo = glm::vec3(0.4, 0.2, 0.1);
 	diffuseMaterial1.smoothness = 0.0;
 	diffuseMaterial1.emission = 0.0f;
 	m_sceneMaterials.push_back(diffuseMaterial1);
 
-	testSphere.center = glm::vec3(-4, 1, 0);
-	testSphere.materialIndex = m_sceneMaterials.size() - 1;
-	m_sceneSpheres.push_back(testSphere);
-
 	GPUMaterial reflectiveMaterial;
 	reflectiveMaterial.albedo = glm::vec3(0.7, 0.6, 0.5);
 	reflectiveMaterial.smoothness = 1.0;
 	reflectiveMaterial.fuzziness = 0.0;
-
 	m_sceneMaterials.push_back(reflectiveMaterial);
 
-	testSphere.center = glm::vec3(4, 1, 0);
-	testSphere.materialIndex = m_sceneMaterials.size() - 1;
-	m_sceneSpheres.push_back(testSphere);
+	CreateSphere(glm::vec3(0, -1000, 0), 1000.0f, groundMaterial);
+	CreateSphere(glm::vec3(0, 1, 0), 1.0f, glassMaterial);
+	CreateSphere(glm::vec3(-4, 1, 0), 1.0f, diffuseMaterial1);
+	CreateSphere(glm::vec3(4, 1, 0), 1.0f, reflectiveMaterial);
 
 	BufferSceneData();
 }
 
 void HardwareRenderer::BufferSceneData()
 {
-	m_sceneSphereBuffer = CreateBuffer(sizeof(GPUSphere) * m_sceneSpheres.size(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneSphereBuffer");
+	m_sceneAABBBuffer = CreateBuffer(sizeof(GPUAABB) * m_sceneAABBs.size()+1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneAABBBuffer");
 	void* data;
+	vmaMapMemory(m_allocator, m_sceneAABBBuffer.m_allocation, &data);
+	memcpy(data, m_sceneAABBs.data(), sizeof(GPUAABB) * m_sceneAABBs.size());
+	vmaUnmapMemory(m_allocator, m_sceneAABBBuffer.m_allocation);
+
+	m_sceneSphereBuffer = CreateBuffer(sizeof(GPUSphere) * m_sceneSpheres.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneSphereBuffer");
 	vmaMapMemory(m_allocator, m_sceneSphereBuffer.m_allocation, &data);
 	memcpy(data, m_sceneSpheres.data(), sizeof(GPUSphere) * m_sceneSpheres.size());
 	vmaUnmapMemory(m_allocator, m_sceneSphereBuffer.m_allocation);
 
-	m_sceneMaterialBuffer = CreateBuffer(sizeof(GPUMaterial) * m_sceneMaterials.size(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneMaterialBuffer");
+	m_sceneMaterialBuffer = CreateBuffer(sizeof(GPUMaterial) * m_sceneMaterials.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneMaterialBuffer");
 	vmaMapMemory(m_allocator, m_sceneMaterialBuffer.m_allocation, &data);
 	memcpy(data, m_sceneMaterials.data(), sizeof(GPUMaterial) * m_sceneMaterials.size());
 	vmaUnmapMemory(m_allocator, m_sceneMaterialBuffer.m_allocation);
 
 	DescriptorWriter writer;
-	writer.WriteBuffer(0, m_sceneSphereBuffer.m_buffer, sizeof(GPUSphere) * m_sceneSpheres.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-	writer.WriteBuffer(1, m_sceneMaterialBuffer.m_buffer, sizeof(GPUMaterial) * m_sceneMaterials.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(0, m_sceneAABBBuffer.m_buffer, sizeof(GPUAABB) * m_sceneAABBs.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(1, m_sceneSphereBuffer.m_buffer, sizeof(GPUSphere) * m_sceneSpheres.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(2, m_sceneMaterialBuffer.m_buffer, sizeof(GPUMaterial) * m_sceneMaterials.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 	writer.UpdateSet(m_device, m_sceneDescriptor);
 }
 
@@ -604,7 +622,7 @@ void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
 	m_pushConstants.defocusAngle = m_camera.defocusAngle;
 	m_pushConstants.defocusDiskU = defocusRadius * u;
 	m_pushConstants.defocusDiskV = defocusRadius * v;
-	m_pushConstants.sphereCount = m_sceneSpheres.size();
+	m_pushConstants.parentAABBCount = m_sceneAABBs.size();
 
 	std::vector<VkDescriptorSet> sets;
 	sets.push_back(m_drawImageDescriptors);
