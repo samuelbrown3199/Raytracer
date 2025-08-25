@@ -780,14 +780,23 @@ void HardwareRenderer::MainLoop()
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
 			static float sunlightColour[3] = { m_pushConstants.sunColour[0], m_pushConstants.sunColour[1], m_pushConstants.sunColour[2] };
-			ImGui::DragFloat3("Sunlight Colour", sunlightColour, 0.01f, 0.0f, 1.0f);
+			if (ImGui::DragFloat3("Sunlight Colour", sunlightColour, 0.01f, 0.0f, 1.0f))
+			{
+				m_bRefreshAccumulation = true;
+			}
 			m_pushConstants.sunColour = glm::vec3(sunlightColour[0], sunlightColour[1], sunlightColour[2]);
 
 			static float sunlightDirection[3] = { m_pushConstants.sunDirection[0], m_pushConstants.sunDirection[1], m_pushConstants.sunDirection[2] };
-			ImGui::DragFloat3("Sunlight Direction", sunlightDirection, 0.01f, -1.0f, 1.0f);
+			if(ImGui::DragFloat3("Sunlight Direction", sunlightDirection, 0.01f, -1.0f, 1.0f))
+			{
+				m_bRefreshAccumulation = true;
+			}
 			m_pushConstants.sunDirection = glm::normalize(glm::vec3(sunlightDirection[0], sunlightDirection[1], sunlightDirection[2]));
 
-			ImGui::DragFloat("Sunlight Intensity", &m_pushConstants.sunIntensity, 0.01f, 0.0f, 10.0f);
+			if(ImGui::DragFloat("Sunlight Intensity", &m_pushConstants.sunIntensity, 0.01f, 0.0f, 10.0f))
+			{
+				m_bRefreshAccumulation = true;
+			}
 
 			ImGui::End();
 		}
