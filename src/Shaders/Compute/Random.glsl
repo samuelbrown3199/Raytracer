@@ -14,12 +14,14 @@ float RandomSeed(inout uint seed)
 // Generates a random integer in [min, max]
 int RandomIntInRange(int min, int max, inout uint seed)
 {
+    seed += 1u;
     return min + int(RandomSeed(seed) * float(max - min + 1));
 }
 
 // Generates a random float in [min, max]
 float RandomFloatInRange(float min, float max, inout uint seed)
 {
+    seed += 1u;
     return mix(min, max, RandomSeed(seed));
 }
 
@@ -39,6 +41,7 @@ uint SeedFromCoords(uint x, uint y)
 
 vec3 SampleSquare(inout uint seed) 
 {
+    seed += 1u;
     float x = RandomFloatInRange(0.0, 1.0, seed);
     float y = RandomFloatInRange(0.0, 1.0, seed);
     return vec3(x - 0.5, y - 0.5, 0.0);
@@ -46,6 +49,7 @@ vec3 SampleSquare(inout uint seed)
 
 vec3 RandomInUnitDisk(inout uint seed)
 {
+    seed += 1u;
 	while (true)
 	{
 		vec3 p = vec3(RandomFloatInRange(-1.0, 1.0, seed), RandomFloatInRange(-1.0, 1.0, seed), 0.0);
@@ -56,11 +60,13 @@ vec3 RandomInUnitDisk(inout uint seed)
 
 vec3 RandomVector(inout uint seed)
 {
+    seed += 1u;
     return vec3(RandomFloatInRange(-1.0, 1.0, seed), RandomFloatInRange(-1.0, 1.0, seed), RandomFloatInRange(-1.0, 1.0, seed));
 }
 
 vec3 RandomUnitVector(inout uint seed)
 {
+    seed += 1u;
 	while (true)
 	{
 		vec3 p = RandomVector(seed);
@@ -72,6 +78,7 @@ vec3 RandomUnitVector(inout uint seed)
 
 vec3 RandomOnHemisphere(vec3 normal, inout uint seed)
 {
+    seed += 1u;
 	vec3 onUnitSphere = RandomUnitVector(seed);
 	if (dot(onUnitSphere, normal) > 0.0)
 		return onUnitSphere;

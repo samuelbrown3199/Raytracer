@@ -5,7 +5,8 @@
 #include "Random.glsl"
 
 layout (local_size_x = 32, local_size_y = 32) in;
-layout(rgba16f, set = 0, binding = 0) uniform image2D image;
+layout(rgba32f, set = 0, binding = 0) uniform image2D outputImage;
+layout(rgba32f, set = 0, binding = 1) uniform image2D accumulationImage;
 
 struct Ray
 {
@@ -77,7 +78,7 @@ layout(push_constant) uniform constants
     int sphereCount;
 
     vec3 defocusU;
-    int renderMode;
+    int padding2;
 
     vec3 defocusV;
     int frame;
@@ -266,28 +267,24 @@ vec3 RayColour(Ray ray, inout RayHit rec, inout uint seed)
             break;
         }
 
-        bool addDirectLight = bounce == 0;
-        if(addDirectLight)
+        float nDotL = max(dot(rec.normal, -PushConstants.sunDir), 0.0);
+        if(nDotL > 0.0)
         {
-            float nDotL = max(dot(rec.normal, -PushConstants.sunDir), 0.0);
-            if(nDotL > 0.0)
+            Ray shadowRay;
+            shadowRay.origin = rec.point + rec.normal * 0.001;
+            shadowRay.direction = -PushConstants.sunDir;
+
+            bool occluded = AnyHit(shadowRay, 0.001, 1e20);
+            if(!occluded)
             {
-                Ray shadowRay;
-                shadowRay.origin = rec.point + rec.normal * 0.001;
-                shadowRay.direction = -PushConstants.sunDir;
+                vec3 sun = PushConstants.sunStrength * PushConstants.sunColour;
 
-                bool occluded = AnyHit(shadowRay, 0.001, 1e20);
-                if(!occluded)
-                {
-                    vec3 sun = PushConstants.sunStrength * PushConstants.sunColour;
+                const float INV_PI = 0.31830988618;
+                vec3 direct = sun * (nDotL * INV_PI);
 
-                    const float INV_PI = 0.31830988618;
-                    vec3 direct = sun * (nDotL * INV_PI);
+                Material recMat = materials[rec.matIndex];
 
-                    Material recMat = materials[rec.matIndex];
-
-                    result += throughput * recMat.colour * direct;
-                }
+                result += throughput * recMat.colour * direct;
             }
         }
         
@@ -315,31 +312,33 @@ void main()
 {
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
     ivec2 localCoord = ivec2(gl_LocalInvocationID.xy);
-    ivec2 size = imageSize(image);
+    ivec2 size = imageSize(outputImage);
 
     if (texelCoord.x < size.x && texelCoord.y < size.y)
     {
-        vec4 colour = vec4(0,0,0,1);
+        vec4 newColour = vec4(0,0,0,1);
+        vec4 accumulatedColour = imageLoad(accumulationImage, texelCoord);
 
-        uint seed = PushConstants.frame;
-        RandomSeed(seed);
-        seed = SeedFromCoords(texelCoord.x + localCoord.x, texelCoord.y +  localCoord.y);
-
+        uint baseSeed = uint(texelCoord.x + texelCoord.y * size.x) + uint(PushConstants.frame) * 7919u; // prime multiplier
         for (int i = 0; i < PushConstants.raysPerPixel; i++)
         {
-            float junk = RandomSeed(seed);
-
+            uint seed = baseSeed + uint(i) * 37u; // different for each sample
             Ray ray = GetRay(texelCoord, seed);
             RayHit rec;
-
-            colour.rgb += RayColour(ray, rec, seed);
+            newColour.rgb += RayColour(ray, rec, seed);
         }
-        colour.rgb /= float(PushConstants.raysPerPixel);
+        newColour.rgb /= float(PushConstants.raysPerPixel);
 
-        colour[0] = LinearToGamma(colour[0]);
-        colour[1] = LinearToGamma(colour[1]);
-        colour[2] = LinearToGamma(colour[2]);
+        accumulatedColour.rgb += newColour.rgb;
+        imageStore(accumulationImage, texelCoord, accumulatedColour);
 
-        imageStore(image, texelCoord, colour);
+        vec4 avgColour = accumulatedColour;
+        avgColour.rgb /= float(PushConstants.frame + 1);
+
+        accumulatedColour[0] = LinearToGamma(accumulatedColour[0]);
+        accumulatedColour[1] = LinearToGamma(accumulatedColour[1]);
+        accumulatedColour[2] = LinearToGamma(accumulatedColour[2]);
+
+        imageStore(outputImage, texelCoord, avgColour);
     }   
 }

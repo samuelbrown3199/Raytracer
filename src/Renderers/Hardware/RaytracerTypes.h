@@ -34,10 +34,10 @@ struct RaytracePushConstants
     int sphereCount;
 
 	glm::vec3 defocusDiskU;
-	int renderMode;
+	int padding2;
 
 	glm::vec3 defocusDiskV;
-    int frame;
+    int frame = 0;
 
 	glm::vec3 sunDirection = glm::vec3(-0.5, -1.0, -0.3);
 	float sunIntensity = 5.0f;

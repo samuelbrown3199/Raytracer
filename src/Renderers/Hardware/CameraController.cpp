@@ -24,31 +24,44 @@ void CameraController::Update(HardwareRenderer* renderer)
 	if (!m_bLockedMouse)
 		return;
 
+	bool hasMoved = false;
+
 	if (inputManager->GetKey(SDLK_W))
 	{
 		renderer->m_camera.cameraPosition += (m_fMoveSpeed) * renderer->m_camera.cameraLookDirection * deltaTime;
+		hasMoved = true;
 	}
 	if (inputManager->GetKey(SDLK_S))
 	{
 		renderer->m_camera.cameraPosition -= (m_fMoveSpeed) * renderer->m_camera.cameraLookDirection * deltaTime;
+		hasMoved = true;
 	}
 	if (inputManager->GetKey(SDLK_A))
 	{
 		glm::vec3 direction = glm::cross(renderer->m_camera.cameraLookDirection, glm::vec3(0, 1, 0));
 		renderer->m_camera.cameraPosition -= (m_fMoveSpeed) * direction * deltaTime;
+		hasMoved = true;
 	}
 	if (inputManager->GetKey(SDLK_D))
 	{
 		glm::vec3 direction = glm::cross(renderer->m_camera.cameraLookDirection, glm::vec3(0, 1, 0));
 		renderer->m_camera.cameraPosition += (m_fMoveSpeed) * direction * deltaTime;
+		hasMoved = true;
 	}
 	if (inputManager->GetKey(SDLK_SPACE))
 	{
 		renderer->m_camera.cameraPosition += (m_fMoveSpeed) * glm::vec3(0, 1, 0) * deltaTime;
+		hasMoved = true;
 	}
 	if (inputManager->GetKey(SDLK_X))
 	{
 		renderer->m_camera.cameraPosition -= (m_fMoveSpeed)*glm::vec3(0, 1, 0) * deltaTime;
+		hasMoved = true;
+	}
+
+	if (hasMoved)
+	{
+		renderer->m_bRefreshAccumulation = true;
 	}
 }
 
@@ -56,6 +69,8 @@ void CameraController::UpdateCameraRotation(HardwareRenderer* renderer)
 {
 	InputManager* inputManager = renderer->GetInputManager();
 	float deltaTime = renderer->GetPerformanceStats()->GetDeltaT();
+
+	glm::vec3 oldDirection = renderer->m_camera.cameraLookDirection;
 
 	if (m_bLockedMouse)
 	{
@@ -75,6 +90,9 @@ void CameraController::UpdateCameraRotation(HardwareRenderer* renderer)
 		front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
 
 		renderer->m_camera.cameraLookDirection = glm::normalize(front);
+
+		if (oldDirection != renderer->m_camera.cameraLookDirection)
+			renderer->m_bRefreshAccumulation = true;
 	}
 	else
 	{

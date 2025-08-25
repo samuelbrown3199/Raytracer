@@ -63,7 +63,7 @@ struct SwapChainSupportDetails
 
 struct CameraSettings
 {
-	glm::vec3 cameraPosition = glm::vec3(0, 5, 0);
+	glm::vec3 cameraPosition = glm::vec3(0, 1, 5);
 	glm::vec3 cameraLookDirection = glm::vec3(0,0,-1);
 	float cameraFov = 90.0f;
 	float focusDistance = 10.0f;
@@ -98,10 +98,14 @@ private:
 	bool m_bRun = true;
 	bool m_bInitialized = false;
 
+	int m_iRefreshAccumulation = 50;
+	bool m_bRefreshAccumulation = true;
+
 	uint32_t m_iCurrentFrame = 0;
 	const static int MAX_FRAMES_IN_FLIGHT = 2;
 	FrameData m_frames[MAX_FRAMES_IN_FLIGHT];
 
+	AllocatedImage m_accumulationImage;
 	AllocatedImage m_drawImage;
 	VkExtent2D m_drawExtent;
 	VkFilter m_drawFilter = VK_FILTER_NEAREST;
@@ -171,10 +175,12 @@ private:
 
 	void Quit();
 
+	void RandomSpheresInRange(int minX, int maxX, int minZ, int maxZ);
 	void InitializeScene();
 	void BufferSceneData();
 
 	void DispatchRayTracingCommands(VkCommandBuffer cmd);
+	void RefreshAccumulation(VkCommandBuffer cmd);
 	void RenderImGui(VkCommandBuffer cmd, VkImage targetImage, VkImageView targetImageView);
 	virtual void RenderFrame();
 	void MainLoop();

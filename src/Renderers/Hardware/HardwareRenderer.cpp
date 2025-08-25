@@ -140,10 +140,12 @@ void HardwareRenderer::InitializeSwapchain()
 	drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 	drawImageUsages |= VK_IMAGE_USAGE_SAMPLED_BIT;
 
-	m_drawImage = CreateImage(this, drawImageExtent, VK_FORMAT_R16G16B16A16_SFLOAT, drawImageUsages, false, "DrawImage");
+	m_drawImage = CreateImage(this, drawImageExtent, VK_FORMAT_R32G32B32A32_SFLOAT, drawImageUsages, false, "DrawImage");
+	m_accumulationImage = CreateImage(this, drawImageExtent, VK_FORMAT_R32G32B32A32_SFLOAT, drawImageUsages, false, "AccumulationImage");
 
 	DescriptorWriter writer;
 	writer.WriteImage(0, m_drawImage.m_imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+	writer.WriteImage(1, m_accumulationImage.m_imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 	writer.UpdateSet(m_device, m_drawImageDescriptors);
 }
 
@@ -225,10 +227,12 @@ void HardwareRenderer::RecreateSwapchain()
 	m_bInitialized = false;
 
 	DestroyImage(this, &m_drawImage);
+	DestroyImage(this, &m_accumulationImage);
 
 	DestroySwapchain();
 	InitializeSwapchain();
 
+	m_bRefreshAccumulation = true;
 	m_bInitialized = true;
 }
 
@@ -291,8 +295,8 @@ void HardwareRenderer::InitializeDescriptors()
 {
 	std::vector<DescriptorAllocator::PoolSizeRatio> sizes =
 	{
-		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 }
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 5 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 5 }
 	};
 
 	m_globalDescriptorAllocator.InitializePool(m_device, 10, sizes);
@@ -300,6 +304,7 @@ void HardwareRenderer::InitializeDescriptors()
 	{
 		DescriptorLayoutBuilder builder;
 		builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
+		builder.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
 
 		m_drawImageDescriptorLayout = builder.Build(m_device);
 	}
@@ -447,20 +452,23 @@ void HardwareRenderer::Quit()
 	m_bRun = false;
 }
 
-void HardwareRenderer::InitializeScene()
+void HardwareRenderer::RandomSpheresInRange(int minX, int maxX, int minZ, int maxZ)
 {
-	for (int i = -5; i < 5; ++i)
-	{
-		for (int j = -5; j < 5; ++j)
-		{
-			glm::vec3 center(i + 0.9 * RandomDouble(), 0.22, j + 0.9 * RandomDouble());
+	float randomSphereHeight = 0.22f;
+	float distanceFromOrigin = 2.75f;
 
-			if ((center - glm::vec3(4, 0.22, 0)).length() > 1.2)
+	for (int i = minX; i < maxX; ++i)
+	{
+		for (int j = minZ; j < maxZ; ++j)
+		{
+			glm::vec3 center(i + 0.9 * RandomDouble(), randomSphereHeight, j + 0.9 * RandomDouble());
+
+			if ((center - glm::vec3(0, randomSphereHeight, 0)).length() > distanceFromOrigin && (center - glm::vec3(4, randomSphereHeight, 0)).length() > distanceFromOrigin && (center - glm::vec3(-4, randomSphereHeight, 0)).length() > distanceFromOrigin)
 			{
 				glm::vec3 albedo = glm::vec3(RandomDouble(), RandomDouble(), RandomDouble());
 				GPUMaterial newMaterial;
 				newMaterial.albedo = albedo;
-				
+
 				float reflectChance = RandomDouble();
 				if (reflectChance < 0.85f)
 					newMaterial.smoothness = 0.0f;
@@ -480,6 +488,15 @@ void HardwareRenderer::InitializeScene()
 			}
 		}
 	}
+}
+
+void HardwareRenderer::InitializeScene()
+{
+	float randomSphereHeight = 0.22f;
+	float distanceFromOrigin = 2.75f;
+
+	RandomSpheresInRange(-5, 5, -5, 2);
+	RandomSpheresInRange(-5, 5, 3, 5);
 
 	GPUMaterial groundMaterial;
 	groundMaterial.albedo = glm::vec3(0.5, 0.5, 0.5);
@@ -590,6 +607,16 @@ void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
 	vkCmdDispatch(cmd, groupCountX, groupCountY, 1);
 }
 
+void HardwareRenderer::RefreshAccumulation(VkCommandBuffer cmd)
+{
+	VkClearColorValue clearColor = { 0.0f, 0.0f, 0.0f, 0.0f };
+	VkImageSubresourceRange clearRange = ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
+	vkCmdClearColorImage(cmd, m_accumulationImage.m_image, VK_IMAGE_LAYOUT_GENERAL, &clearColor, 1, &clearRange);
+
+	m_pushConstants.frame = 0;
+	m_bRefreshAccumulation = false;
+}
+
 void HardwareRenderer::RenderImGui(VkCommandBuffer cmd, VkImage targetImage, VkImageView targetImageView)
 {
 	ImGui::Render();
@@ -640,6 +667,7 @@ void HardwareRenderer::RenderFrame()
 		throw std::exception("Failed to begin command buffer.");
 
 	TransitionImage(cmd, m_drawImage.m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+	TransitionImage(cmd, m_accumulationImage.m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
 	m_drawExtent.width = m_drawImage.m_imageExtent.width;
 	m_drawExtent.height = m_drawImage.m_imageExtent.height;
@@ -659,6 +687,9 @@ void HardwareRenderer::RenderFrame()
 	scissor.extent.height = m_drawExtent.height;
 
 	vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+	if(/*m_pushConstants.frame >= m_iRefreshAccumulation ||*/ m_bRefreshAccumulation)
+		RefreshAccumulation(cmd);
 
 	DispatchRayTracingCommands(cmd);
 
@@ -757,10 +788,6 @@ void HardwareRenderer::MainLoop()
 			m_pushConstants.sunDirection = glm::normalize(glm::vec3(sunlightDirection[0], sunlightDirection[1], sunlightDirection[2]));
 
 			ImGui::DragFloat("Sunlight Intensity", &m_pushConstants.sunIntensity, 0.01f, 0.0f, 10.0f);
-
-			//static bool accumulated = false;
-			//ImGui::Checkbox("Accumulate Frames", &accumulated);
-			//m_pushConstants.renderMode = accumulated;
 
 			ImGui::End();
 		}
