@@ -454,7 +454,7 @@ void HardwareRenderer::Quit()
 
 void HardwareRenderer::RandomSpheresInRange(int minX, int maxX, int minZ, int maxZ)
 {
-	float randomSphereHeight = 0.22f;
+	float randomSphereHeight = 0.20f;
 	float distanceFromOrigin = 2.75f;
 
 	for (int i = minX; i < maxX; ++i)
@@ -496,8 +496,8 @@ void HardwareRenderer::InitializeScene()
 	float randomSphereHeight = 0.22f;
 	float distanceFromOrigin = 2.75f;
 
-	RandomSpheresInRange(-5, 5, -5, 2);
-	RandomSpheresInRange(-5, 5, 3, 5);
+	RandomSpheresInRange(-5, 5, -5,-1);
+	RandomSpheresInRange(-5, 5, 1, 5);
 
 	GPUMaterial groundMaterial;
 	groundMaterial.albedo = glm::vec3(0.5, 0.5, 0.5);
@@ -514,7 +514,8 @@ void HardwareRenderer::InitializeScene()
 	GPUMaterial glassMaterial;
 	glassMaterial.albedo = glm::vec3(1.0, 1.0, 1.0);
 	glassMaterial.smoothness = 0.0;
-	glassMaterial.emission = 1.0f;
+	glassMaterial.refractiveIndex = 1.5;
+	glassMaterial.absorbtion = glm::vec3(0,0,0);
 	m_sceneMaterials.push_back(glassMaterial);
 
 	GPUSphere testSphere;

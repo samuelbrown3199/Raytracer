@@ -60,6 +60,12 @@ struct GPUMaterial
 {
 	glm::vec3 albedo = glm::vec3(1.0f, 1.0f, 1.0f);
 	float smoothness = 0.0f;
+
 	float emission = 0.0f;
-	glm::vec3 padding;
+	float refractiveIndex = 0.0f;
+	float padding1;
+	float padding2;
+
+	glm::vec3 absorbtion = glm::vec3(0,0,0);
+	float padding3;
 };

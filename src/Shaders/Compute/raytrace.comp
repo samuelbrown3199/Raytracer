@@ -19,6 +19,8 @@ struct Material
     vec3 colour;
     float smoothness;
     float emission;
+    float refractionIndex;
+    vec3 absorbtion;
 };
 
 struct RayHit
@@ -113,7 +115,8 @@ bool IntersectSphere(Ray ray, Sphere sphere, Interval t, out RayHit rec)
 	rec.t = root;
 	rec.point = PointAtT(rec.t, ray);
 	vec3 outwardNormal = (rec.point - sphere.center) / sphere.radius;
-    rec.normal = outwardNormal;
+    rec.frontFace = dot(ray.direction, outwardNormal) < 0.0;
+    rec.normal = rec.frontFace ? outwardNormal : -outwardNormal;
     rec.matIndex = sphere.materialIndex;
 
 	return true;
@@ -131,16 +134,56 @@ bool AnyHit(Ray r, float tMin, float tMax)
     RayHit rec;
     for (int i = 0; i < PushConstants.sphereCount; i++)
     {
+
         if (IntersectSphere(r, spheres[i], t, rec))
+        {
+            Material mat = materials[rec.matIndex];
+            if(mat.emission > 0.0)
+                continue;
+
             return true;
+        }
     }
     return false;
 }
+
+float Reflectance(float cosine, float refIdx)
+{
+    // Use Schlick's approximation for reflectance.
+    float r0 = (1.0 - refIdx) / (1.0 + refIdx);
+    r0 = r0 * r0;
+    return r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
+}
+
+bool DielectricScatter(Ray rayIn, RayHit rec, float refIdx, out vec3 attenuation, out Ray scattered, uint seed)
+{
+    Material targetMat = materials[rec.matIndex];
+    attenuation = targetMat.colour * exp(-targetMat.absorbtion * rec.t);
+    float etaiOverEtat = rec.frontFace ? (1.0 / refIdx) : refIdx;
+    vec3 unitDirection = normalize(rayIn.direction);
+    float cosTheta = min(dot(-unitDirection, rec.normal), 1.0);
+    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+    bool cannotRefract = etaiOverEtat * sinTheta > 1.0;
+    vec3 direction;
+    if (cannotRefract || Reflectance(cosTheta, refIdx) > RandomFloatInRange(0, 1, seed))
+        direction = reflect(unitDirection, rec.normal);
+    else
+        direction = refract(unitDirection, rec.normal, etaiOverEtat);
+    scattered.origin = rec.point;
+    scattered.direction = direction;
+    return true;
+}
+
 
 bool MaterialScatter(Ray rayIn, RayHit rec, out vec3 attenuation, out Ray scattered, uint seed)
 {
     float scatterOrReflect = RandomFloatInRange(0, 1, seed);
     Material targetMat = materials[rec.matIndex];
+
+    if(targetMat.refractionIndex > 0.0)
+    {
+        return DielectricScatter(rayIn, rec, targetMat.refractionIndex, attenuation, scattered, seed);
+    }
 
     if(scatterOrReflect < targetMat.smoothness)
     {
@@ -176,6 +219,35 @@ float LinearToGamma(float linearComponent)
 		return sqrt(linearComponent);
 
     return 0;
+}
+
+vec3 ShadowTransmission(Ray r, float tMin, float tMax)
+{
+    Interval t; t.min = tMin; t.max = tMax;
+    RayHit rec;
+    vec3 transmission = vec3(1.0);
+
+    for (int i = 0; i < PushConstants.sphereCount; i++)
+    {
+        if (IntersectSphere(r, spheres[i], t, rec))
+        {
+            Material mat = materials[rec.matIndex];
+            if (mat.emission > 0.0)
+                continue; // skip light sources
+
+            if (mat.refractionIndex > 0.0)
+            {
+                // Beer-Lambert law: transmission *= exp(-absorption * distance)
+                float dist = rec.t;
+                transmission *= exp(-mat.absorbtion * dist);
+                // Continue tracing through, don't block
+                continue;
+            }
+            // Opaque: block shadow
+            return vec3(0.0);
+        }
+    }
+    return transmission;
 }
 
 vec3 GetEnvironmentColour(Ray ray)
@@ -295,13 +367,12 @@ vec3 RayColour(Ray ray, inout RayHit rec, inout uint seed)
             shadowRay.origin = rec.point + rec.normal * 0.001;
             shadowRay.direction = -PushConstants.sunDir;
 
-            bool occluded = AnyHit(shadowRay, 0.001, 1e20);
-            if(!occluded)
-            {
+            vec3 shadowTrans = ShadowTransmission(shadowRay, 0.001, 1e20);
+            if (shadowTrans != vec3(0.0)) {
                 vec3 sun = PushConstants.sunStrength * PushConstants.sunColour;
                 const float INV_PI = 0.31830988618;
                 vec3 direct = sun * (nDotL * INV_PI);
-                result += throughput * recMat.colour * direct;
+                result += throughput * recMat.colour * direct * shadowTrans;
             }
         }
 
