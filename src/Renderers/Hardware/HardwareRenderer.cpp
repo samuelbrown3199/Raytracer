@@ -472,7 +472,13 @@ void HardwareRenderer::RandomSpheresInRange(int minX, int maxX, int minZ, int ma
 
 				float reflectChance = RandomDouble();
 				if (reflectChance < 0.85f)
+				{
 					newMaterial.smoothness = 0.0f;
+
+					float emissionChance = RandomDouble();
+					if(emissionChance < 0.25f)
+						newMaterial.emission = RandomDouble(1.0f, 5.0f);
+				}
 				else
 					newMaterial.smoothness = RandomDouble();
 
@@ -537,6 +543,7 @@ void HardwareRenderer::InitializeScene()
 	GPUMaterial reflectiveMaterial;
 	reflectiveMaterial.albedo = glm::vec3(0.7, 0.6, 0.5);
 	reflectiveMaterial.smoothness = 1.0;
+	reflectiveMaterial.fuzziness = 0.0;
 
 	m_sceneMaterials.push_back(reflectiveMaterial);
 
@@ -767,42 +774,50 @@ void HardwareRenderer::MainLoop()
 
 		if(!cameraController.m_bLockedMouse)
 		{
+			bool resetAccumulation = false;
+
 			ImGui::Begin("Raytracer Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
 			ImGui::SeparatorText("Camera Settings");
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
-			ImGui::DragFloat("Field of View", &m_camera.cameraFov, 0.1f, 1.0f, 179.0f);
-			ImGui::DragFloat("Focus Distance", &m_camera.focusDistance, 0.1f, 0.1f, 1000.0f);
-			ImGui::DragFloat("Defocus Angle", &m_camera.defocusAngle, 0.1f, 0.0f, 90.0f);
+			if(ImGui::DragFloat("Field of View", &m_camera.cameraFov, 0.1f, 1.0f, 179.0f))
+				resetAccumulation = true;
+
+			if (ImGui::DragFloat("Focus Distance", &m_camera.focusDistance, 0.1f, 0.1f, 1000.0f))
+				resetAccumulation = true;
+
+			if(ImGui::DragFloat("Defocus Angle", &m_camera.defocusAngle, 0.1f, 0.0f, 90.0f))
+				resetAccumulation = true;
 
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 			ImGui::SeparatorText("Render Settings");
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
-			ImGui::DragInt("Rays Per Pixel", &m_pushConstants.raysPerPixel, 1, 1, 100);
-			ImGui::DragInt("Max Bounces", &m_pushConstants.maxBounces, 1, 1, 100);
+			if(ImGui::DragInt("Rays Per Pixel", &m_pushConstants.raysPerPixel, 1, 1, 100))
+				resetAccumulation = true;
+
+			if (ImGui::DragInt("Max Bounces", &m_pushConstants.maxBounces, 1, 1, 100))
+				resetAccumulation = true;
 
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
 			static float sunlightColour[3] = { m_pushConstants.sunColour[0], m_pushConstants.sunColour[1], m_pushConstants.sunColour[2] };
 			if (ImGui::DragFloat3("Sunlight Colour", sunlightColour, 0.01f, 0.0f, 1.0f))
-			{
-				m_bRefreshAccumulation = true;
-			}
+				resetAccumulation = true;
+
 			m_pushConstants.sunColour = glm::vec3(sunlightColour[0], sunlightColour[1], sunlightColour[2]);
 
 			static float sunlightDirection[3] = { m_pushConstants.sunDirection[0], m_pushConstants.sunDirection[1], m_pushConstants.sunDirection[2] };
 			if(ImGui::DragFloat3("Sunlight Direction", sunlightDirection, 0.01f, -1.0f, 1.0f))
-			{
-				m_bRefreshAccumulation = true;
-			}
+				resetAccumulation = true;
+
 			m_pushConstants.sunDirection = glm::normalize(glm::vec3(sunlightDirection[0], sunlightDirection[1], sunlightDirection[2]));
 
-			if(ImGui::DragFloat("Sunlight Intensity", &m_pushConstants.sunIntensity, 0.01f, 0.0f, 10.0f))
-			{
-				m_bRefreshAccumulation = true;
-			}
+			if (ImGui::DragFloat("Sunlight Intensity", &m_pushConstants.sunIntensity, 0.01f, 0.0f, 10.0f))
+				resetAccumulation = true;
+
+			m_bRefreshAccumulation = m_bRefreshAccumulation || resetAccumulation;
 
 			ImGui::End();
 		}
