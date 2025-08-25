@@ -58,6 +58,8 @@ struct GPUSphere
 
 struct GPUMaterial
 {
-	glm::vec3 albedo;
-	float smoothness;
+	glm::vec3 albedo = glm::vec3(1.0f, 1.0f, 1.0f);
+	float smoothness = 0.0f;
+	float emission = 0.0f;
+	glm::vec3 padding;
 };

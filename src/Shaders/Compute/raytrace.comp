@@ -18,6 +18,7 @@ struct Material
 {
     vec3 colour;
     float smoothness;
+    float emission;
 };
 
 struct RayHit
@@ -162,6 +163,13 @@ bool MaterialScatter(Ray rayIn, RayHit rec, out vec3 attenuation, out Ray scatte
     return true;
 }
 
+bool MaterialEmission(Ray rayIn, RayHit rec, out vec3 emitted)
+{
+    Material targetMat = materials[rec.matIndex];
+    emitted = targetMat.colour * targetMat.emission;
+    return true;
+}
+
 float LinearToGamma(float linearComponent)
 {
     if(linearComponent > 0)
@@ -180,8 +188,8 @@ vec3 GetEnvironmentColour(Ray ray)
     vec3 dayZenith    = vec3(0.5, 0.7, 1.0);   // bright blue
     vec3 dayHorizon   = vec3(1.0, 1.0, 1.0);   // whiteish horizon
     vec3 sunriseColor = vec3(1.0, 0.4, 0.2);   // warm orange
-    vec3 nightZenith  = vec3(0.02, 0.05, 0.2); // deep blue night
-    vec3 nightHorizon = vec3(0.1, 0.1, 0.15);  // dark horizon glow
+    vec3 nightZenith  = vec3(0.0, 0.0, 0.0); // deep blue night
+    vec3 nightHorizon = vec3(0.0, 0.0, 0.0);  // dark horizon glow
 
     // Vertical gradient factor (ray direction, not sun)
     float viewT = clamp(0.5 * (unitDir.y + 1.0), 0.0, 1.0);
@@ -267,6 +275,19 @@ vec3 RayColour(Ray ray, inout RayHit rec, inout uint seed)
             break;
         }
 
+        // Emission
+        vec3 emitted;
+        MaterialEmission(ray, rec, emitted);
+        result += throughput * emitted;
+
+        // If the material is emissive, stop bouncing
+        Material recMat = materials[rec.matIndex];
+        if (recMat.emission > 0.0)
+        {
+            break;
+        }
+
+        // Direct lighting (sun)
         float nDotL = max(dot(rec.normal, -PushConstants.sunDir), 0.0);
         if(nDotL > 0.0)
         {
@@ -278,26 +299,17 @@ vec3 RayColour(Ray ray, inout RayHit rec, inout uint seed)
             if(!occluded)
             {
                 vec3 sun = PushConstants.sunStrength * PushConstants.sunColour;
-
                 const float INV_PI = 0.31830988618;
                 vec3 direct = sun * (nDotL * INV_PI);
-
-                Material recMat = materials[rec.matIndex];
-
                 result += throughput * recMat.colour * direct;
             }
         }
-        
-        //TODO: Emission
-        // vec3 emitted = rec.mat.emission; // example
-        // result += throughput * emitted;
 
         // Scatter
         Ray scattered;
         vec3 attenuation;
         if (!MaterialScatter(ray, rec, attenuation, scattered, seed))
         {
-            // absorbed: terminate
             break;
         }
 

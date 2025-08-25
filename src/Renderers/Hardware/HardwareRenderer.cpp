@@ -468,6 +468,7 @@ void HardwareRenderer::RandomSpheresInRange(int minX, int maxX, int minZ, int ma
 				glm::vec3 albedo = glm::vec3(RandomDouble(), RandomDouble(), RandomDouble());
 				GPUMaterial newMaterial;
 				newMaterial.albedo = albedo;
+				newMaterial.emission = 0.0f;
 
 				float reflectChance = RandomDouble();
 				if (reflectChance < 0.85f)
@@ -501,6 +502,7 @@ void HardwareRenderer::InitializeScene()
 	GPUMaterial groundMaterial;
 	groundMaterial.albedo = glm::vec3(0.5, 0.5, 0.5);
 	groundMaterial.smoothness = 0.0;
+	groundMaterial.emission = 0.0f;
 	m_sceneMaterials.push_back(groundMaterial);
 
 	GPUSphere groundSphere;
@@ -512,6 +514,7 @@ void HardwareRenderer::InitializeScene()
 	GPUMaterial glassMaterial;
 	glassMaterial.albedo = glm::vec3(1.0, 1.0, 1.0);
 	glassMaterial.smoothness = 0.0;
+	glassMaterial.emission = 1.0f;
 	m_sceneMaterials.push_back(glassMaterial);
 
 	GPUSphere testSphere;
@@ -523,6 +526,7 @@ void HardwareRenderer::InitializeScene()
 	GPUMaterial diffuseMaterial1;
 	diffuseMaterial1.albedo = glm::vec3(0.4, 0.2, 0.1);
 	diffuseMaterial1.smoothness = 0.0;
+	diffuseMaterial1.emission = 0.0f;
 	m_sceneMaterials.push_back(diffuseMaterial1);
 
 	testSphere.center = glm::vec3(-4, 1, 0);
@@ -532,6 +536,7 @@ void HardwareRenderer::InitializeScene()
 	GPUMaterial reflectiveMaterial;
 	reflectiveMaterial.albedo = glm::vec3(0.7, 0.6, 0.5);
 	reflectiveMaterial.smoothness = 1.0;
+
 	m_sceneMaterials.push_back(reflectiveMaterial);
 
 	testSphere.center = glm::vec3(4, 1, 0);
