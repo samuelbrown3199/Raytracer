@@ -805,7 +805,8 @@ void HardwareRenderer::MainLoop()
 			ImGui::Begin("Performance Stats", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 			
 			ImGui::Text("Frame Time: %.2f ms", m_performanceStats.GetPerformanceMeasurement("Frame")->GetPerformanceMeasurementInMilliseconds());
-			ImGui::Text("FPS: %.1f", m_performanceStats.GetAvgFPS());
+			ImGui::Text("FPS: %.1f", m_performanceStats.GetFPS());
+			ImGui::Text("AVG FPS: %.1f", m_performanceStats.GetAvgFPS());
 
 			ImGui::End();
 		}
