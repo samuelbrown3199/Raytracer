@@ -374,7 +374,17 @@ vec3 RayColour(Ray ray, inout RayHit rec, inout uint seed)
                 vec3 sun = PushConstants.sunStrength * PushConstants.sunColour;
                 const float INV_PI = 0.31830988618;
                 vec3 direct = sun * (nDotL * INV_PI);
-                result += throughput * recMat.colour * direct * shadowTrans;
+
+                // Only apply direct lighting to non-refractive (non-glass) materials
+                if (recMat.refractionIndex == 0.0)
+                {
+                    result += throughput * recMat.colour * direct * shadowTrans;
+                }
+                else if (recMat.refractionIndex > 0.0)
+                {
+                     float fresnel = Reflectance(nDotL, recMat.refractionIndex);
+                     result += throughput * fresnel * direct * shadowTrans;
+                }
             }
         }
 
