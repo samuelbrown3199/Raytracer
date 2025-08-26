@@ -540,7 +540,7 @@ void HardwareRenderer::InitializeScene()
 
 	AddSceneObject(smoothSpherePath, glm::vec3(0, 1.1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), emissiveMaterial);
 	AddSceneObject(smoothSpherePath, glm::vec3(0, 1.1, -5), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), diffuseMaterial);
-	AddSceneObject(testModelPath, glm::vec3(0, 0, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), groundMaterial);
+	AddSceneObject(testModelPath, glm::vec3(0, 0, 0), glm::vec3(0, 0, 0), glm::vec3(1000, 1000, 1000), groundMaterial);
 
 	BufferSceneData();
 }
@@ -945,6 +945,32 @@ void HardwareRenderer::LoadModel(const std::string& filePath)
 			maxY = static_cast<int>(std::ceil(newTriangle.v0.y));
 		if (newTriangle.v0.z > maxZ)
 			maxZ = static_cast<int>(std::ceil(newTriangle.v0.z));
+
+		if (newTriangle.v1.x < minX)
+			minX = static_cast<int>(std::floor(newTriangle.v1.x));
+		if (newTriangle.v1.y < minY)
+			minY = static_cast<int>(std::floor(newTriangle.v1.y));
+		if (newTriangle.v1.z < minZ)
+			minZ = static_cast<int>(std::floor(newTriangle.v1.z));
+		if (newTriangle.v1.x > maxX)
+			maxX = static_cast<int>(std::ceil(newTriangle.v1.x));
+		if (newTriangle.v1.y > maxY)
+			maxY = static_cast<int>(std::ceil(newTriangle.v1.y));
+		if (newTriangle.v1.z > maxZ)
+			maxZ = static_cast<int>(std::ceil(newTriangle.v1.z));
+
+		if (newTriangle.v2.x < minX)
+			minX = static_cast<int>(std::floor(newTriangle.v2.x));
+		if (newTriangle.v2.y < minY)
+			minY = static_cast<int>(std::floor(newTriangle.v2.y));
+		if (newTriangle.v2.z < minZ)
+			minZ = static_cast<int>(std::floor(newTriangle.v2.z));
+		if (newTriangle.v2.x > maxX)
+			maxX = static_cast<int>(std::ceil(newTriangle.v2.x));
+		if (newTriangle.v2.y > maxY)
+			maxY = static_cast<int>(std::ceil(newTriangle.v2.y));
+		if (newTriangle.v2.z > maxZ)
+			maxZ = static_cast<int>(std::ceil(newTriangle.v2.z));
 
 		m_sceneTriangles.push_back(newTriangle);
 	}
