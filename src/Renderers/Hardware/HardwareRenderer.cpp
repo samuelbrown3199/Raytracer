@@ -513,33 +513,39 @@ void HardwareRenderer::InitializeScene()
 	m_sceneMaterials.push_back(groundMaterial);
 
 	GPUMaterial diffuseMaterial;
-	diffuseMaterial.albedo = glm::vec3(1.0, 0.0, 0.0);
+	diffuseMaterial.albedo = glm::vec3(0.8, 0.8, 0.8);
+	diffuseMaterial.emission = 0.0f;
 	m_sceneMaterials.push_back(diffuseMaterial);
 
 	GPUMaterial glassMaterial;
 	glassMaterial.albedo = glm::vec3(1.0, 1.0, 1.0);
 	glassMaterial.refractiveIndex = 1.5f;
+	glassMaterial.emission = 0.0f;
 	m_sceneMaterials.push_back(glassMaterial);
 
 	GPUMaterial reflectiveMaterial;
 	reflectiveMaterial.albedo = glm::vec3(1.0, 1.0, 1.0);
 	reflectiveMaterial.smoothness = 1.0;
 	reflectiveMaterial.fuzziness = 0.0f;
+	reflectiveMaterial.emission = 0.0f;
 	m_sceneMaterials.push_back(reflectiveMaterial);
 
 	GPUMaterial emissiveMaterial;
 	emissiveMaterial.albedo = glm::vec3(1.0, 1.0, 1.0);
-	emissiveMaterial.emission = 5.0f;
+	emissiveMaterial.emission = 15.0f;
 	m_sceneMaterials.push_back(emissiveMaterial);
 
 	std::string testModelPath = GetWorkingDirectory() + "\\Resources\\Models\\flat_quad.obj";
 	LoadModel(testModelPath);
 
-	std::string smoothSpherePath = GetWorkingDirectory() + "\\Resources\\Models\\smooth_sphere.obj";
-	LoadModel(smoothSpherePath);
+	std::string spherePath = GetWorkingDirectory() + "\\Resources\\Models\\icosphere.obj";
+	LoadModel(spherePath);
 
-	AddSceneObject(smoothSpherePath, glm::vec3(0, 1.1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), emissiveMaterial);
-	AddSceneObject(smoothSpherePath, glm::vec3(0, 1.1, -5), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), diffuseMaterial);
+	AddSceneObject(spherePath, glm::vec3(-4, 1.1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), reflectiveMaterial);
+	AddSceneObject(spherePath, glm::vec3(0, 1.1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), glassMaterial);
+	AddSceneObject(spherePath, glm::vec3(4, 1.1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), diffuseMaterial);
+	AddSceneObject(spherePath, glm::vec3(0, 5, 0), glm::vec3(0, 0, 0), glm::vec3(0.5, 0.5, 0.5), emissiveMaterial);
+
 	AddSceneObject(testModelPath, glm::vec3(0, 0, 0), glm::vec3(0, 0, 0), glm::vec3(1000, 1000, 1000), groundMaterial);
 
 	BufferSceneData();

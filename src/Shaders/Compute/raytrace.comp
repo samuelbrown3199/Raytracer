@@ -358,61 +358,44 @@ bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec)
 
 vec3 ShadowTransmission(Ray r, float tMin, float tMax)
 {
-    Interval t; t.min = tMin; t.max = tMax;
     RayHit rec;
     vec3 transmission = vec3(1.0);
 
-    float closestSoFar = t.max;
-    rec.t = t.max;
-    rec.hitObject = false;
-
-    for (int i = 0; i < PushConstants.parentAABBCount; i++)
+    // Trace the shadow ray for occluders
+    int maxIterations = 4;
+    while (GetHit(r, tMin, tMax, rec))
     {
-        AABB targetAABB = aabbs[i];
-        if (IntersectAABB(r, targetAABB, t))
+        maxIterations--;
+        if(maxIterations == 0)
+            break;
+
+        Material mat = materials[rec.matIndex];
+
+        // Skip light sources (don't block shadow)
+        if (mat.emission > 0.0)
         {
-            Object targetObject = objects[targetAABB.objectIndex];
-            int start = targetObject.triangleStartIndex;
-            int end = start + targetObject.triangleCount;
-            vec4 localOrigin = targetObject.inverseTransform * vec4(r.origin, 1.0);
-            vec4 localDirection = targetObject.inverseTransform * vec4(r.direction, 0.0);
-            Ray localRay;
-            localRay.origin = localOrigin.xyz;
-            localRay.direction = normalize(localDirection.xyz);
-
-            for (int triIndex = start; triIndex < end; triIndex++)
-            {
-                Interval newInterval; newInterval.min = t.min; newInterval.max = closestSoFar;
-                if (IntersectTriangle(localRay, triangles[triIndex], newInterval, rec))
-                {
-                    // Transform intersection point and normal back to world space if needed
-                    mat4 objectTransform = inverse(targetObject.inverseTransform);
-                    rec.point = (objectTransform * vec4(rec.point, 1.0)).xyz;
-                    mat3 normalMatrix = mat3(transpose(targetObject.inverseTransform));
-                    rec.normal = normalize(normalMatrix * rec.normal);
-                    rec.matIndex = targetObject.materialIndex;
-
-                    Material mat = materials[rec.matIndex];
-
-                    if (mat.emission > 0.0)
-                        continue; // skip light sources
-
-                    if (mat.refractionIndex > 0.0)
-                    {
-                        // Beer-Lambert law: transmission *= exp(-absorption * distance)
-                        float dist = rec.t;
-                        transmission *= exp(-mat.absorbtion * dist);
-                        // Continue tracing through, don't block
-                        continue;
-                    }
-
-                    // Opaque: block shadow
-                    return vec3(0.0);
-                }
-            }
+            // Move the ray origin past the light and keep searching
+            r.origin = rec.point + rec.normal * 0.001;
+            tMin = 0.001;
+            continue;
         }
+
+        // Handle transparent/refractive materials (Beer-Lambert law)
+        if (mat.refractionIndex > 0.0)
+        {
+            float dist = rec.t;
+            transmission *= exp(-mat.absorbtion * dist);
+            // Move the ray origin past this object and keep searching
+            r.origin = rec.point + rec.normal * 0.001;
+            tMin = 0.001;
+            continue;
+        }
+
+        // Opaque: fully block the shadow
+        return vec3(0.0);
     }
 
+    // No occluder found, return accumulated transmission
     return transmission;
 }
 
