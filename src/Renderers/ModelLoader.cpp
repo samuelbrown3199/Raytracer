@@ -27,7 +27,7 @@ void LoadObjFile(const std::string& filePath, std::vector<Vertex>& vertices)
 
             vertex.m_position[0] = attrib.vertices[3 * index.vertex_index + 0];
             vertex.m_position[1] = attrib.vertices[3 * index.vertex_index + 1];
-            vertex.m_position[1] = attrib.vertices[3 * index.vertex_index + 2];
+            vertex.m_position[2] = attrib.vertices[3 * index.vertex_index + 2];
 
             if (attrib.texcoords.size() != 0)
             {

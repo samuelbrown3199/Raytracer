@@ -53,16 +53,30 @@ bool IntervalSurrounds(Interval interval, float value)
 struct AABB
 {
     vec3 boxMin;
-    int objectType;
-    vec3 boxMax;
     int objectIndex;
+    vec3 boxMax;
 };
 
-struct Sphere
+struct Triangle
 {
-    vec3 center;
-    float radius;
-    int materialIndex;
+    vec3 v0;
+    vec3 v1;
+    vec3 v2;
+    vec2 uv0;
+    vec2 uv1;
+    vec2 uv2;
+    vec3 n0;
+    vec3 n1;
+    vec3 n2;
+};
+
+struct Object
+{
+	int triangleStartIndex;
+	int triangleCount;
+	int materialIndex;
+
+	mat4 inverseTransform;
 };
 
 layout(set=1, binding=0) readonly buffer AABBBuffer
@@ -70,12 +84,17 @@ layout(set=1, binding=0) readonly buffer AABBBuffer
     AABB aabbs[];
 };
 
-layout(set=1, binding=1) readonly buffer SphereBuffer
+layout(std140, set=1, binding=1) readonly buffer TriangleBuffer
 {
-	Sphere spheres[];
+	Triangle triangles[];
 };
 
-layout(set=1, binding=2) readonly buffer MaterialBuffer
+layout(std140, set=1, binding=2) readonly buffer ObjectBuffer
+{
+    Object objects[];
+};
+
+layout(set=1, binding=3) readonly buffer MaterialBuffer
 {
     Material materials[];
 };
@@ -95,7 +114,7 @@ layout(push_constant) uniform constants
     int parentAABBCount;
 
     vec3 defocusU;
-    int padding2;
+    int accumulateFrames;
 
     vec3 defocusV;
     int frame;
@@ -107,82 +126,88 @@ layout(push_constant) uniform constants
 
 } PushConstants;
 
-bool IntersectAABB(Ray ray, AABB box, Interval t)
+bool IntersectAABB(Ray ray, AABB box, inout Interval t)
 {
-    for (int a = 0; a < 3; a++)
+    // assume ray.direction is normalized (or call normalize outside)
+    for (int a = 0; a < 3; ++a)
     {
-        float invD = 1.0 / ray.direction[a];
-        float t0 = (box.boxMin[a] - ray.origin[a]) * invD;
-        float t1 = (box.boxMax[a] - ray.origin[a]) * invD;
-        if (invD < 0.0)
-        {
-            float temp = t0;
-            t0 = t1;
-            t1 = temp;
+        float originA = ray.origin[a];
+        float dirA = ray.direction[a];
+        float minA = box.boxMin[a];
+        float maxA = box.boxMax[a];
+
+        if (abs(dirA) < 1e-8) {
+            // Ray is parallel to slab. If origin not within slab -> miss.
+            if (originA < minA || originA > maxA)
+                return false;
+            // else parallel and inside slab -> no change to t
+        } else {
+            float invD = 1.0 / dirA;
+            float t0 = (minA - originA) * invD;
+            float t1 = (maxA - originA) * invD;
+            if (invD < 0.0) {
+                // swap
+                float tmp = t0;
+                t0 = t1;
+                t1 = tmp;
+            }
+            t.min = max(t.min, t0);
+            t.max = min(t.max, t1);
+            if (t.max <= t.min) return false;
         }
-        t.min = max(t0, t.min);
-        t.max = min(t1, t.max);
-        if (t.max <= t.min)
-            return false;
     }
     return true;
 }
 
-bool IntersectSphere(Ray ray, Sphere sphere, Interval t, out RayHit rec)
+bool IntersectTriangle(Ray ray, Triangle tri, Interval t, in out RayHit rec)
 {
-	vec3 oc = sphere.center - ray.origin;
-	float a = length(ray.direction)*length(ray.direction);
-	float h = dot(ray.direction, oc);
-	float c = (length(oc)*length(oc)) - sphere.radius * sphere.radius;
-	float discriminant = h * h - a * c;
-	if (discriminant < 0)
-		return false;
+    vec3 edge1 = tri.v1 - tri.v0;
+    vec3 edge2 = tri.v2 - tri.v0;
+    vec3 h = cross(ray.direction, edge2);
+    float a = dot(edge1, h);
+    if (abs(a) < 1e-8)
+        return false; // Ray is parallel to triangle
 
-	float sqrtDiscriminant = sqrt(discriminant);
-	float root = (h - sqrtDiscriminant) / a;
-	if (!IntervalSurrounds(t, root))
-	{
-		root = (h + sqrtDiscriminant) / a;
-		if (!IntervalSurrounds(t, root))
-			return false;
-	}
+    float invDet = 1.0 / a;
+    vec3 s = ray.origin - tri.v0;
+    float u = invDet * dot(s, h);
+    if (u < 0.0 || u > 1.0)
+        return false;
 
-	rec.t = root;
-	rec.point = PointAtT(rec.t, ray);
-	vec3 outwardNormal = (rec.point - sphere.center) / sphere.radius;
-    rec.frontFace = dot(ray.direction, outwardNormal) < 0.0;
-    rec.normal = rec.frontFace ? outwardNormal : -outwardNormal;
-    rec.matIndex = sphere.materialIndex;
+    vec3 sCross = cross(s, edge1);
+    float v = invDet * dot(ray.direction, sCross);
+    if (v < 0.0 || u + v > 1.0)
+        return false;
 
-	return true;
+    float hitT = invDet * dot(edge2, sCross);
+    if (!IntervalSurrounds(t, hitT))
+        return false;
+
+    if(hitT > 1e-8)
+    {
+        rec.t = hitT;
+        rec.point = PointAtT(rec.t, ray);
+
+         // --- Smooth normal interpolation ---
+        float w = 1.0 - u - v;
+        vec3 interpolatedNormal = normalize(tri.n0 * w + tri.n1 * u + tri.n2 * v);
+
+        rec.frontFace = dot(ray.direction, interpolatedNormal) < 0.0;
+        rec.normal = rec.frontFace ? interpolatedNormal : -interpolatedNormal;
+        rec.hitObject = true;
+
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 bool NearZero(vec3 v)
 {
     const float s = 1e-8;
     return (abs(v.x) < s) && (abs(v.y) < s) && (abs(v.z) < s);
-}
-
-bool AnyHit(Ray r, float tMin, float tMax)
-{
-    Interval t; t.min = tMin; t.max = tMax;
-    RayHit rec;
-    for (int i = 0; i < PushConstants.parentAABBCount; i++)
-    {
-        AABB targetAABB = aabbs[i];
-        if(IntersectAABB(r, targetAABB, t))
-        {
-            if (IntersectSphere(r, spheres[targetAABB.objectIndex], t, rec))
-            {
-                Material mat = materials[rec.matIndex];
-                if(mat.emission > 0.0)
-                    continue;
-
-                return true;
-            }
-        }
-    }
-    return false;
 }
 
 float Reflectance(float cosine, float refIdx)
@@ -208,7 +233,7 @@ bool DielectricScatter(Ray rayIn, RayHit rec, float refIdx, out vec3 attenuation
     else
         direction = refract(unitDirection, rec.normal, etaiOverEtat);
     scattered.origin = rec.point;
-    scattered.direction = direction;
+    scattered.direction = normalize(direction);
     return true;
 }
 
@@ -223,12 +248,14 @@ bool MaterialScatter(Ray rayIn, RayHit rec, out vec3 attenuation, out Ray scatte
         return DielectricScatter(rayIn, rec, targetMat.refractionIndex, attenuation, scattered, seed);
     }
 
+    const float EPSILON = 1e-4;
+
     if(scatterOrReflect < targetMat.smoothness)
     {
         vec3 reflected = reflect(normalize(rayIn.direction), rec.normal);
         reflected += targetMat.fuzziness * RandomOnHemisphere(rec.normal, seed);
-        scattered.origin = rec.point;
-        scattered.direction = reflected;
+        scattered.origin = rec.point + reflected * EPSILON;
+        scattered.direction = normalize(reflected);
         attenuation = targetMat.colour;
     }
     else
@@ -237,8 +264,8 @@ bool MaterialScatter(Ray rayIn, RayHit rec, out vec3 attenuation, out Ray scatte
         if(NearZero(scatterDirection))
             scatterDirection = rec.normal;
 
-        scattered.origin = rec.point;
-        scattered.direction = scatterDirection;
+        scattered.origin = rec.point + scatterDirection * EPSILON;
+        scattered.direction = normalize(scatterDirection);
         attenuation = targetMat.colour;
     }
 
@@ -260,36 +287,132 @@ float LinearToGamma(float linearComponent)
     return 0;
 }
 
+bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec)
+{
+    // Work with a normalized ray copy to make all t-space consistent.
+    Ray r;
+    r.origin = r_in.origin;
+    r.direction = normalize(r_in.direction);
+
+    float closestSoFar = tMax;
+    rec.t = tMax;
+    rec.hitObject = false;
+
+    for (int i = 0; i < PushConstants.parentAABBCount; i++)
+    {
+        AABB targetAABB = aabbs[i];
+        Interval interval; interval.min = tMin; interval.max = closestSoFar;
+
+        if (IntersectAABB(r, targetAABB, interval))
+        {
+            Object targetObject = objects[targetAABB.objectIndex];
+
+            int start = targetObject.triangleStartIndex;
+            int end   = start + targetObject.triangleCount;
+
+            // Transform ray into local space (use inverseTransform from object)
+            vec4 localOrigin    = targetObject.inverseTransform * vec4(r.origin, 1.0);
+            vec4 localDirection = targetObject.inverseTransform * vec4(r.direction, 0.0);
+
+            Ray localRay;
+            localRay.origin    = localOrigin.xyz;
+            // normalize local direction so triangle intersection t is local parametric
+            localRay.direction = normalize(localDirection.xyz);
+
+            mat4 objectTransform = inverse(targetObject.inverseTransform); // world transform
+            mat3 normalMatrix    = mat3(transpose(targetObject.inverseTransform));
+
+            for (int triIndex = start; triIndex < end; triIndex++)
+            {
+                Interval triInterval; 
+                triInterval.min = tMin; 
+                triInterval.max = 1e30;
+
+                RayHit tempRec;
+                if (IntersectTriangle(localRay, triangles[triIndex], triInterval, tempRec))
+                {
+                    // Transform hit to world space
+                    vec3 worldPoint  = (objectTransform * vec4(tempRec.point, 1.0)).xyz;
+                    vec3 worldNormal = normalize(normalMatrix * tempRec.normal);
+
+                    // Parametric distance along the normalized world ray
+                    float worldT = dot(worldPoint - r.origin, r.direction);
+
+                    if (worldT > tMin && worldT < closestSoFar)
+                    {
+                        closestSoFar  = worldT;
+                        rec.t         = worldT; 
+                        rec.point     = worldPoint;
+                        rec.normal    = worldNormal;
+                        rec.matIndex  = targetObject.materialIndex;
+                        rec.frontFace = dot(r.direction, worldNormal) < 0.0;
+                        rec.hitObject = true;
+                    }
+                }
+            }
+        }
+    }
+
+    return rec.hitObject;
+}
+
 vec3 ShadowTransmission(Ray r, float tMin, float tMax)
 {
     Interval t; t.min = tMin; t.max = tMax;
     RayHit rec;
     vec3 transmission = vec3(1.0);
 
+    float closestSoFar = t.max;
+    rec.t = t.max;
+    rec.hitObject = false;
+
     for (int i = 0; i < PushConstants.parentAABBCount; i++)
     {
         AABB targetAABB = aabbs[i];
-        if(IntersectAABB(r, targetAABB, t))
+        if (IntersectAABB(r, targetAABB, t))
         {
-            if (IntersectSphere(r, spheres[targetAABB.objectIndex], t, rec))
-            {
-                Material mat = materials[rec.matIndex];
-                if (mat.emission > 0.0)
-                    continue; // skip light sources
+            Object targetObject = objects[targetAABB.objectIndex];
+            int start = targetObject.triangleStartIndex;
+            int end = start + targetObject.triangleCount;
+            vec4 localOrigin = targetObject.inverseTransform * vec4(r.origin, 1.0);
+            vec4 localDirection = targetObject.inverseTransform * vec4(r.direction, 0.0);
+            Ray localRay;
+            localRay.origin = localOrigin.xyz;
+            localRay.direction = normalize(localDirection.xyz);
 
-                if (mat.refractionIndex > 0.0)
+            for (int triIndex = start; triIndex < end; triIndex++)
+            {
+                Interval newInterval; newInterval.min = t.min; newInterval.max = closestSoFar;
+                if (IntersectTriangle(localRay, triangles[triIndex], newInterval, rec))
                 {
-                    // Beer-Lambert law: transmission *= exp(-absorption * distance)
-                    float dist = rec.t;
-                    transmission *= exp(-mat.absorbtion * dist);
-                    // Continue tracing through, don't block
-                    continue;
+                    // Transform intersection point and normal back to world space if needed
+                    mat4 objectTransform = inverse(targetObject.inverseTransform);
+                    rec.point = (objectTransform * vec4(rec.point, 1.0)).xyz;
+                    mat3 normalMatrix = mat3(transpose(targetObject.inverseTransform));
+                    rec.normal = normalize(normalMatrix * rec.normal);
+                    rec.matIndex = targetObject.materialIndex;
+
+                    Material mat = materials[rec.matIndex];
+
+                    if (mat.emission > 0.0)
+                        continue; // skip light sources
+
+                    if (mat.refractionIndex > 0.0)
+                    {
+                        // Beer-Lambert law: transmission *= exp(-absorption * distance)
+                        float dist = rec.t;
+                        transmission *= exp(-mat.absorbtion * dist);
+                        // Continue tracing through, don't block
+                        continue;
+                    }
+
+                    // Opaque: block shadow
+                    return vec3(0.0);
                 }
-                // Opaque: block shadow
-                return vec3(0.0);
             }
         }
     }
+
     return transmission;
 }
 
@@ -369,25 +492,9 @@ vec3 RayColour(Ray ray, inout RayHit rec, inout uint seed)
 
     for (int bounce = 0; bounce < PushConstants.maxBounces; bounce++)
     {
-        Interval t; t.min = 0.001; t.max = 100000.0;
-        float closestSoFar = t.max;
-        bool hitObject = false;
+        GetHit(ray, 0.001, 1e20, rec);
 
-        for (int i = 0; i < PushConstants.parentAABBCount; i++)
-        {
-            AABB targetAABB = aabbs[i];
-            if(IntersectAABB(ray, targetAABB, t))
-            {
-                Interval newInterval; newInterval.min = t.min; newInterval.max = closestSoFar;
-                if (IntersectSphere(ray, spheres[targetAABB.objectIndex], newInterval, rec))
-                {
-                    closestSoFar = rec.t;
-                    hitObject = true;
-                }
-            }
-        }
-
-        if (!hitObject)
+        if (!rec.hitObject)
         {
             vec3 bg = GetEnvironmentColour(ray);
             result += throughput * bg;
@@ -469,16 +576,37 @@ void main()
         }
         newColour.rgb /= float(PushConstants.raysPerPixel);
 
+
         accumulatedColour.rgb += newColour.rgb;
         imageStore(accumulationImage, texelCoord, accumulatedColour);
 
-        vec4 avgColour = accumulatedColour;
-        avgColour.rgb /= float(PushConstants.frame + 1);
+        vec4 avgColour = PushConstants.accumulateFrames == 1 ? accumulatedColour : newColour;
+        avgColour.rgb /= PushConstants.accumulateFrames == 1 ? float(PushConstants.frame + 1) : 1;
 
-        accumulatedColour[0] = LinearToGamma(accumulatedColour[0]);
-        accumulatedColour[1] = LinearToGamma(accumulatedColour[1]);
-        accumulatedColour[2] = LinearToGamma(accumulatedColour[2]);
+        avgColour[0] = LinearToGamma(avgColour[0]);
+        avgColour[1] = LinearToGamma(avgColour[1]);
+        avgColour[2] = LinearToGamma(avgColour[2]);
 
         imageStore(outputImage, texelCoord, avgColour);
     }   
 }
+
+/*void main() 
+{
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(outputImage);
+
+    if (texelCoord.x < size.x && texelCoord.y < size.y)
+    {
+        Ray ray = GetRay(texelCoord, 123u); // seed not important for depth
+        RayHit rec;
+
+        if (GetHit(ray, 0.001, 1e20, rec)) {
+            float depth = length(rec.point - PushConstants.cameraPosition);
+            depth = clamp(depth / 5.0, 0.0, 1.0); // normalize
+            imageStore(outputImage, texelCoord, vec4(depth, depth, depth, 1.0));
+        } else {
+            imageStore(outputImage, texelCoord, vec4(0,0,0,1));
+        }
+    }
+}*/

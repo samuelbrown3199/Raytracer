@@ -222,7 +222,7 @@ public:
 		bbox = AABB(minPt, maxPt);
 	}
 
-	bool Hit(const Ray& r, Interval t, HitRecord& rec) const override
+	bool Hit(const Ray& r, Interval intervalT, HitRecord& rec) const override
 	{
 		Vector3 edge1 = B - A;
 		Vector3 edge2 = C - A;

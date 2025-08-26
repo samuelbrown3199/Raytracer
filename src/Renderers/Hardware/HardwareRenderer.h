@@ -3,6 +3,7 @@
 #include <deque>
 #include <functional>
 #include <mutex>
+#include <unordered_map>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -70,6 +71,23 @@ struct CameraSettings
 	float defocusAngle = 0.0f;
 };
 
+struct Model
+{
+	int triangleStartIndex = -1;
+	int triangleCount = 0;
+
+	GPUAABB boundingBox;
+};
+
+struct SceneObject
+{
+	std::string modelName;
+	glm::vec3 position = glm::vec3(0, 0, 0);
+	glm::vec3 rotation = glm::vec3(0, 0, 0);
+	glm::vec3 scale = glm::vec3(1, 1, 1);
+	int materialIndex = -1;
+};
+
 class HardwareRenderer
 {
 	friend class Window;
@@ -98,7 +116,6 @@ private:
 	bool m_bRun = true;
 	bool m_bInitialized = false;
 
-	int m_iRefreshAccumulation = 50;
 	bool m_bRefreshAccumulation = true;
 
 	uint32_t m_iCurrentFrame = 0;
@@ -142,11 +159,17 @@ private:
 	PerformanceStats m_performanceStats;
 	InputManager m_inputManager;
 
+	std::unordered_map<std::string, Model> m_models;
+	std::vector<SceneObject> m_sceneObjects;
+
 	//Scene Data and buffers
+
+	std::vector<GPUObject> m_gpuSceneObjects;
+	AllocatedBuffer m_sceneObjectBuffer;
+	std::vector<GPUTriangle> m_sceneTriangles;
+	AllocatedBuffer m_sceneTriangleBuffer;
 	std::vector<GPUAABB> m_sceneAABBs;
 	AllocatedBuffer m_sceneAABBBuffer;
-	std::vector<GPUSphere> m_sceneSpheres;
-	AllocatedBuffer m_sceneSphereBuffer;
 	std::vector<GPUMaterial> m_sceneMaterials;
 	AllocatedBuffer m_sceneMaterialBuffer;
 
@@ -178,9 +201,9 @@ private:
 	void Quit();
 
 	int GetMaterialIndex(const GPUMaterial& material);
-	void CreateSphere(glm::vec3 center, float radius, GPUMaterial material);
+	void AddSceneObject(std::string modelPath, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, const GPUMaterial& material);
+	void ConvertSceneObjectToGPUObject(const SceneObject& obj);
 
-	void RandomSpheresInRange(int minX, int maxX, int minZ, int maxZ);
 	void InitializeScene();
 	void BufferSceneData();
 
@@ -193,6 +216,8 @@ private:
 public:
 
 	void InitializeRenderer();
+
+	void LoadModel(const std::string& filePath);
 
 	InputManager* GetInputManager() { return &m_inputManager; }
 	PerformanceStats* GetPerformanceStats() { return &m_performanceStats; }

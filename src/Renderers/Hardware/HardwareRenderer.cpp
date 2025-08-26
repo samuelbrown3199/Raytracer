@@ -314,6 +314,7 @@ void HardwareRenderer::InitializeDescriptors()
 		builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 		builder.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 		builder.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+		builder.AddBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 		m_sceneDescriptorLayout = builder.Build(m_device);
 	}
 
@@ -464,120 +465,109 @@ int HardwareRenderer::GetMaterialIndex(const GPUMaterial& material)
 	return -1;
 }
 
-void HardwareRenderer::CreateSphere(glm::vec3 center, float radius, GPUMaterial material)
+void HardwareRenderer::AddSceneObject(std::string modelPath, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, const GPUMaterial& material)
 {
-	GPUSphere newSphere;
-	newSphere.center = center;
-	newSphere.radius = radius;
+	SceneObject newObject;
+	newObject.modelName = modelPath;
+	newObject.position = position;
+	newObject.rotation = rotation;
+	newObject.scale = scale;
+	newObject.materialIndex = GetMaterialIndex(material);
 
-	int materialIndex = GetMaterialIndex(material);
-	if(materialIndex == -1)
-		throw std::exception("Material not found when creating sphere.");
-
-	newSphere.materialIndex = materialIndex;
-
-	GPUAABB newAABB;
-	newAABB.min = center - glm::vec3(radius);
-	newAABB.max = center + glm::vec3(radius);
-	newAABB.objectType = 0;
-	newAABB.objectIndex = m_sceneSpheres.size();
-
-	m_sceneAABBs.push_back(newAABB);
-	m_sceneSpheres.push_back(newSphere);
+	m_sceneObjects.push_back(newObject);
 }
 
-void HardwareRenderer::RandomSpheresInRange(int minX, int maxX, int minZ, int maxZ)
+void HardwareRenderer::ConvertSceneObjectToGPUObject(const SceneObject& obj)
 {
-	float randomSphereHeight = 0.20f;
-	float distanceFromOrigin = 2.75f;
+	GPUObject gpuObject;
 
-	for (int i = minX; i < maxX; ++i)
-	{
-		for (int j = minZ; j < maxZ; ++j)
-		{
-			glm::vec3 center(i + 0.9 * RandomDouble(), randomSphereHeight, j + 0.9 * RandomDouble());
+	glm::mat4 objectMat = glm::mat4(1.0f);
+	objectMat = glm::translate(objectMat, obj.position);
+	objectMat = glm::rotate(objectMat, glm::radians(obj.rotation.x), glm::vec3(1, 0, 0));
+	objectMat = glm::rotate(objectMat, glm::radians(obj.rotation.y), glm::vec3(0, 1, 0));
+	objectMat = glm::rotate(objectMat, glm::radians(obj.rotation.z), glm::vec3(0, 0, 1));
+	objectMat = glm::scale(objectMat, obj.scale);
 
-			if ((center - glm::vec3(0, randomSphereHeight, 0)).length() > distanceFromOrigin && (center - glm::vec3(4, randomSphereHeight, 0)).length() > distanceFromOrigin && (center - glm::vec3(-4, randomSphereHeight, 0)).length() > distanceFromOrigin)
-			{
-				glm::vec3 albedo = glm::vec3(RandomDouble(), RandomDouble(), RandomDouble());
-				GPUMaterial newMaterial;
-				newMaterial.albedo = albedo;
-				newMaterial.emission = 0.0f;
+	GPUAABB objectAABB = m_models[obj.modelName].boundingBox;
+	objectAABB.min = glm::vec4(objectMat * glm::vec4(objectAABB.min, 1.0f));
+	objectAABB.max = glm::vec4(objectMat * glm::vec4(objectAABB.max, 1.0f));
+	objectAABB.objectIndex = m_gpuSceneObjects.size();
 
-				float reflectChance = RandomDouble();
-				if (reflectChance < 0.85f)
-				{
-					newMaterial.smoothness = 0.0f;
+	gpuObject.inverseTransform = glm::inverse(objectMat);
+	gpuObject.materialIndex = obj.materialIndex;
 
-					float emissionChance = RandomDouble();
-					if(emissionChance < 0.25f)
-						newMaterial.emission = RandomDouble(1.0f, 5.0f);
-				}
-				else
-					newMaterial.smoothness = RandomDouble();
+	gpuObject.triangleStartIndex = m_models[obj.modelName].triangleStartIndex;
+	gpuObject.triangleCount = m_models[obj.modelName].triangleCount;
 
-				int newMaterialIndex = m_sceneMaterials.size();
-				m_sceneMaterials.push_back(newMaterial);
+	m_gpuSceneObjects.push_back(gpuObject);
 
-				CreateSphere(center, 0.2f, newMaterial);
-			}
-		}
-	}
+	m_sceneAABBs.push_back(objectAABB);
 }
 
 void HardwareRenderer::InitializeScene()
 {
-	float randomSphereHeight = 0.22f;
-	float distanceFromOrigin = 2.75f;
-
-	RandomSpheresInRange(-5, 5, -5,-1);
-	RandomSpheresInRange(-5, 5, 1, 5);
-
 	GPUMaterial groundMaterial;
 	groundMaterial.albedo = glm::vec3(0.5, 0.5, 0.5);
 	groundMaterial.smoothness = 0.0;
 	groundMaterial.emission = 0.0f;
 	m_sceneMaterials.push_back(groundMaterial);
 
+	GPUMaterial diffuseMaterial;
+	diffuseMaterial.albedo = glm::vec3(1.0, 0.0, 0.0);
+	m_sceneMaterials.push_back(diffuseMaterial);
+
 	GPUMaterial glassMaterial;
 	glassMaterial.albedo = glm::vec3(1.0, 1.0, 1.0);
-	glassMaterial.smoothness = 0.0;
-	glassMaterial.refractiveIndex = 1.5;
-	glassMaterial.absorbtion = glm::vec3(0,0,0);
+	glassMaterial.refractiveIndex = 1.5f;
 	m_sceneMaterials.push_back(glassMaterial);
 
-	GPUMaterial diffuseMaterial1;
-	diffuseMaterial1.albedo = glm::vec3(0.4, 0.2, 0.1);
-	diffuseMaterial1.smoothness = 0.0;
-	diffuseMaterial1.emission = 0.0f;
-	m_sceneMaterials.push_back(diffuseMaterial1);
-
 	GPUMaterial reflectiveMaterial;
-	reflectiveMaterial.albedo = glm::vec3(0.7, 0.6, 0.5);
+	reflectiveMaterial.albedo = glm::vec3(1.0, 1.0, 1.0);
 	reflectiveMaterial.smoothness = 1.0;
-	reflectiveMaterial.fuzziness = 0.0;
+	reflectiveMaterial.fuzziness = 0.0f;
 	m_sceneMaterials.push_back(reflectiveMaterial);
 
-	CreateSphere(glm::vec3(0, -1000, 0), 1000.0f, groundMaterial);
-	CreateSphere(glm::vec3(0, 1, 0), 1.0f, glassMaterial);
-	CreateSphere(glm::vec3(-4, 1, 0), 1.0f, diffuseMaterial1);
-	CreateSphere(glm::vec3(4, 1, 0), 1.0f, reflectiveMaterial);
+	GPUMaterial emissiveMaterial;
+	emissiveMaterial.albedo = glm::vec3(1.0, 1.0, 1.0);
+	emissiveMaterial.emission = 5.0f;
+	m_sceneMaterials.push_back(emissiveMaterial);
+
+	std::string testModelPath = GetWorkingDirectory() + "\\Resources\\Models\\flat_quad.obj";
+	LoadModel(testModelPath);
+
+	std::string smoothSpherePath = GetWorkingDirectory() + "\\Resources\\Models\\smooth_sphere.obj";
+	LoadModel(smoothSpherePath);
+
+	AddSceneObject(smoothSpherePath, glm::vec3(0, 1.1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), emissiveMaterial);
+	AddSceneObject(smoothSpherePath, glm::vec3(0, 1.1, -5), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), diffuseMaterial);
+	AddSceneObject(testModelPath, glm::vec3(0, 0, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), groundMaterial);
 
 	BufferSceneData();
 }
 
 void HardwareRenderer::BufferSceneData()
 {
+	m_gpuSceneObjects.clear();
+	for (const auto& obj : m_sceneObjects)
+	{
+		ConvertSceneObjectToGPUObject(obj);
+	}
+
 	m_sceneAABBBuffer = CreateBuffer(sizeof(GPUAABB) * m_sceneAABBs.size()+1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneAABBBuffer");
 	void* data;
 	vmaMapMemory(m_allocator, m_sceneAABBBuffer.m_allocation, &data);
 	memcpy(data, m_sceneAABBs.data(), sizeof(GPUAABB) * m_sceneAABBs.size());
 	vmaUnmapMemory(m_allocator, m_sceneAABBBuffer.m_allocation);
 
-	m_sceneSphereBuffer = CreateBuffer(sizeof(GPUSphere) * m_sceneSpheres.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneSphereBuffer");
-	vmaMapMemory(m_allocator, m_sceneSphereBuffer.m_allocation, &data);
-	memcpy(data, m_sceneSpheres.data(), sizeof(GPUSphere) * m_sceneSpheres.size());
-	vmaUnmapMemory(m_allocator, m_sceneSphereBuffer.m_allocation);
+	m_sceneTriangleBuffer = CreateBuffer(sizeof(GPUTriangle) * m_sceneTriangles.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneSphereBuffer");
+	vmaMapMemory(m_allocator, m_sceneTriangleBuffer.m_allocation, &data);
+	memcpy(data, m_sceneTriangles.data(), sizeof(GPUTriangle) * m_sceneTriangles.size());
+	vmaUnmapMemory(m_allocator, m_sceneTriangleBuffer.m_allocation);
+
+	m_sceneObjectBuffer = CreateBuffer(sizeof(GPUObject) * m_gpuSceneObjects.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneObjectBuffer");
+	vmaMapMemory(m_allocator, m_sceneObjectBuffer.m_allocation, &data);
+	memcpy(data, m_gpuSceneObjects.data(), sizeof(GPUObject) * m_gpuSceneObjects.size());
+	vmaUnmapMemory(m_allocator, m_sceneObjectBuffer.m_allocation);
 
 	m_sceneMaterialBuffer = CreateBuffer(sizeof(GPUMaterial) * m_sceneMaterials.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneMaterialBuffer");
 	vmaMapMemory(m_allocator, m_sceneMaterialBuffer.m_allocation, &data);
@@ -586,8 +576,9 @@ void HardwareRenderer::BufferSceneData()
 
 	DescriptorWriter writer;
 	writer.WriteBuffer(0, m_sceneAABBBuffer.m_buffer, sizeof(GPUAABB) * m_sceneAABBs.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-	writer.WriteBuffer(1, m_sceneSphereBuffer.m_buffer, sizeof(GPUSphere) * m_sceneSpheres.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-	writer.WriteBuffer(2, m_sceneMaterialBuffer.m_buffer, sizeof(GPUMaterial) * m_sceneMaterials.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(1, m_sceneTriangleBuffer.m_buffer, sizeof(GPUTriangle) * m_sceneTriangles.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(2, m_sceneObjectBuffer.m_buffer, sizeof(GPUObject) * m_gpuSceneObjects.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(3, m_sceneMaterialBuffer.m_buffer, sizeof(GPUMaterial) * m_sceneMaterials.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 	writer.UpdateSet(m_device, m_sceneDescriptor);
 }
 
@@ -719,7 +710,7 @@ void HardwareRenderer::RenderFrame()
 
 	vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-	if(/*m_pushConstants.frame >= m_iRefreshAccumulation ||*/ m_bRefreshAccumulation)
+	if(m_bRefreshAccumulation)
 		RefreshAccumulation(cmd);
 
 	DispatchRayTracingCommands(cmd);
@@ -799,6 +790,9 @@ void HardwareRenderer::MainLoop()
 			ImGui::SeparatorText("Camera Settings");
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
+			std::string cameraPosStr = FormatString("Camera Position: (%.2f, %.2f, %.2f)", m_camera.cameraPosition.x, m_camera.cameraPosition.y, m_camera.cameraPosition.z);
+			ImGui::Text(cameraPosStr.c_str());
+
 			if(ImGui::DragFloat("Field of View", &m_camera.cameraFov, 0.1f, 1.0f, 179.0f))
 				resetAccumulation = true;
 
@@ -807,6 +801,8 @@ void HardwareRenderer::MainLoop()
 
 			if(ImGui::DragFloat("Defocus Angle", &m_camera.defocusAngle, 0.1f, 0.0f, 90.0f))
 				resetAccumulation = true;
+
+			ImGui::DragFloat("Camera Speed", &cameraController.m_fMoveSpeed, 0.1f, 1.0f, 100.0f, "%.1f");
 
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 			ImGui::SeparatorText("Render Settings");
@@ -817,6 +813,13 @@ void HardwareRenderer::MainLoop()
 
 			if (ImGui::DragInt("Max Bounces", &m_pushConstants.maxBounces, 1, 1, 100))
 				resetAccumulation = true;
+
+			static bool accumlateFrames = true;
+			if(ImGui::Checkbox("Accumulate Frames", &accumlateFrames))
+			{
+				resetAccumulation = true;
+			}
+			m_pushConstants.accumulateFrames = accumlateFrames;
 
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
@@ -869,6 +872,110 @@ void HardwareRenderer::InitializeRenderer()
 	InitializeScene();
 
 	MainLoop();
+}
+
+void HardwareRenderer::LoadModel(const std::string& filePath)
+{
+	if(filePath.substr(filePath.find_last_of(".") + 1) != "obj")
+	{
+		throw std::exception("Only .obj files are supported.");
+	}
+
+	if(m_models.find(filePath) != m_models.end())
+	{
+		return;
+	}
+
+	if(FileExists(filePath) == false)
+	{
+		std::string error = filePath + " does not exist.";
+		throw std::exception(error.c_str());
+	}
+
+	Model newModel;
+	GPUAABB modelAABB;
+	newModel.triangleStartIndex = m_sceneTriangles.size();
+
+	std::vector<Vertex> vertices;
+
+	LoadObjFile(filePath, vertices);
+
+	float minX = INT_MAX;
+	float minY = INT_MAX;
+	float minZ = INT_MAX;
+	float maxX = INT_MIN;
+	float maxY = INT_MIN;
+	float maxZ = INT_MIN;
+
+	int triangleCount = vertices.size() / 3;
+	for(int i = 0; i < vertices.size(); i += 3)
+	{
+		GPUTriangle newTriangle;
+		newTriangle.v0 = vertices[i].m_position;
+		newTriangle.v1 = vertices[i + 1].m_position;
+		newTriangle.v2 = vertices[i + 2].m_position;
+
+		if(vertices[i].m_normal != glm::vec3(0.0f) && vertices[i + 1].m_normal != glm::vec3(0.0f) && vertices[i + 2].m_normal != glm::vec3(0.0f))
+		{
+			newTriangle.n0 = glm::normalize(vertices[i].m_normal);
+			newTriangle.n1 = glm::normalize(vertices[i + 1].m_normal);
+			newTriangle.n2 = glm::normalize(vertices[i + 2].m_normal);
+		}
+		else
+		{
+			glm::vec3 edge1 = newTriangle.v1 - newTriangle.v0;
+			glm::vec3 edge2 = newTriangle.v2 - newTriangle.v0;
+			glm::vec3 faceNormal = glm::normalize(glm::cross(edge1, edge2));
+
+			newTriangle.n0 = faceNormal;
+			newTriangle.n1 = faceNormal;
+			newTriangle.n2 = faceNormal;
+		}
+
+		//Check all current bound values and update if needed
+		if(newTriangle.v0.x < minX)
+			minX = static_cast<int>(std::floor(newTriangle.v0.x));
+		if (newTriangle.v0.y < minY)
+			minY = static_cast<int>(std::floor(newTriangle.v0.y));
+		if (newTriangle.v0.z < minZ)
+			minZ = static_cast<int>(std::floor(newTriangle.v0.z));
+		if (newTriangle.v0.x > maxX)
+			maxX = static_cast<int>(std::ceil(newTriangle.v0.x));
+		if (newTriangle.v0.y > maxY)
+			maxY = static_cast<int>(std::ceil(newTriangle.v0.y));
+		if (newTriangle.v0.z > maxZ)
+			maxZ = static_cast<int>(std::ceil(newTriangle.v0.z));
+
+		m_sceneTriangles.push_back(newTriangle);
+	}
+
+	//check the difference in the axis and make sure they are not 0
+	float xDiff = maxX - minX;
+	float yDiff = maxY - minY;
+	float zDiff = maxZ - minZ;
+	if (xDiff == 0)
+	{
+		maxX += 1;
+		minX -= 1;
+	}
+	if (yDiff == 0)
+	{
+		maxY += 1;
+		minY -= 1;
+	}
+	if (zDiff == 0)
+	{
+		maxZ += 1;
+		minZ -= 1;
+	}
+
+	modelAABB.min = glm::vec3(minX, minY, minZ);
+	modelAABB.max = glm::vec3(maxX, maxY, maxZ);
+
+	newModel.triangleCount = triangleCount;
+	newModel.boundingBox = modelAABB;
+
+	m_models[filePath] = newModel;
 }
 
 void HardwareRenderer::ImmediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function)
