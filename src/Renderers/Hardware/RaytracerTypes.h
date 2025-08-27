@@ -54,6 +54,16 @@ struct GPUAABB
 	float padding;
 };
 
+struct BVHNode
+{
+	GPUAABB aabb;
+
+	int leftChild;
+	int rightChild;
+	int triangleStartIndex;
+	int triangleCount;
+};
+
 struct GPUSphere
 {
 	glm::vec3 center;
