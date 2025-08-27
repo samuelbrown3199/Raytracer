@@ -489,7 +489,7 @@ void HardwareRenderer::ConvertSceneObjectToGPUObject(const SceneObject& obj)
 	objectMat = glm::rotate(objectMat, glm::radians(obj.rotation.z), glm::vec3(0, 0, 1));
 	objectMat = glm::scale(objectMat, obj.scale);
 
-	GPUAABB objectAABB = m_models[obj.modelName].boundingBox;
+	GPUAABB objectAABB = m_models[obj.modelName].parentBVH.aabb;
 	objectAABB.min = glm::vec4(objectMat * glm::vec4(objectAABB.min, 1.0f));
 	objectAABB.max = glm::vec4(objectMat * glm::vec4(objectAABB.max, 1.0f));
 
@@ -500,11 +500,9 @@ void HardwareRenderer::ConvertSceneObjectToGPUObject(const SceneObject& obj)
 	gpuObject.triangleCount = m_models[obj.modelName].triangleCount;
 
 
-	ParentBVHNode parentNode;
+	ParentBVHNode parentNode = m_models[obj.modelName].parentBVH;
 	parentNode.aabb = objectAABB;
 	parentNode.objectIndex = m_gpuSceneObjects.size();
-	parentNode.leftChild = m_models[obj.modelName].leftChild;
-	parentNode.rightChild = m_models[obj.modelName].rightChild;
 
 	m_gpuSceneObjects.push_back(gpuObject);
 	m_parentBVH.push_back(parentNode);
@@ -541,16 +539,28 @@ void HardwareRenderer::InitializeScene()
 	emissiveMaterial.emission = 15.0f;
 	m_sceneMaterials.push_back(emissiveMaterial);
 
+	GPUMaterial dullGoldMaterial;
+	dullGoldMaterial.albedo = glm::vec3(1.0, 0.71, 0.29);
+	dullGoldMaterial.smoothness = 0.8f;
+	dullGoldMaterial.fuzziness = 0.2f;
+	dullGoldMaterial.emission = 0.0f;
+	m_sceneMaterials.push_back(dullGoldMaterial);
+
 	std::string testModelPath = GetWorkingDirectory() + "\\Resources\\Models\\flat_quad.obj";
 	LoadModel(testModelPath);
 
 	std::string spherePath = GetWorkingDirectory() + "\\Resources\\Models\\icosphere.obj";
 	LoadModel(spherePath);
 
+	std::string dragonPath = GetWorkingDirectory() + "\\Resources\\Models\\dragon-lowres.obj";
+	LoadModel(dragonPath);
+
 	AddSceneObject(spherePath, glm::vec3(-4, 1.1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), reflectiveMaterial);
 	AddSceneObject(spherePath, glm::vec3(0, 1.1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), glassMaterial);
 	AddSceneObject(spherePath, glm::vec3(4, 1.1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), diffuseMaterial);
 	AddSceneObject(spherePath, glm::vec3(0, 5, 0), glm::vec3(0, 0, 0), glm::vec3(0.5, 0.5, 0.5), emissiveMaterial);
+
+	AddSceneObject(dragonPath, glm::vec3(0, 0.9, -10), glm::vec3(0, 0, 0), glm::vec3(0.5, 0.5, 0.5), dullGoldMaterial);
 
 	AddSceneObject(testModelPath, glm::vec3(0, 0, 0), glm::vec3(0, 0, 0), glm::vec3(1000, 1, 1000), groundMaterial);
 
@@ -897,6 +907,62 @@ void HardwareRenderer::InitializeRenderer()
 	MainLoop();
 }
 
+int HardwareRenderer::BuildBVHRecursive(std::vector<GPUTriangle>& triangles, std::vector<int>& triangleIndices, int start, int end, std::vector<GPUBVHNode>& outNodes)
+{
+	// Compute AABB for this node
+	glm::vec3 min(FLT_MAX), max(-FLT_MAX);
+	for (int i = start; i < end; ++i) {
+		const GPUTriangle& tri = triangles[triangleIndices[i]];
+		min = glm::min(min, glm::min(tri.v0, glm::min(tri.v1, tri.v2)));
+		max = glm::max(max, glm::max(tri.v0, glm::max(tri.v1, tri.v2)));
+	}
+
+	GPUBVHNode node;
+	node.aabb.min = min;
+	node.aabb.max = max;
+
+	int count = end - start;
+	if (count <= 2) {
+		// Leaf node
+		node.leftChild = -1;
+		node.rightChild = -1;
+		node.triangleStartIndex = triangleIndices[start];
+		node.triangleCount = count;
+		outNodes.push_back(node);
+		return static_cast<int>(outNodes.size()) - 1;
+	}
+
+	// Compute centroid bounds and split axis
+	glm::vec3 centroidMin(FLT_MAX), centroidMax(-FLT_MAX);
+	for (int i = start; i < end; ++i) {
+		const GPUTriangle& tri = triangles[triangleIndices[i]];
+		glm::vec3 centroid = (tri.v0 + tri.v1 + tri.v2) / 3.0f;
+		centroidMin = glm::min(centroidMin, centroid);
+		centroidMax = glm::max(centroidMax, centroid);
+	}
+	glm::vec3 extent = centroidMax - centroidMin;
+	int axis = 0;
+	if (extent.y > extent.x && extent.y > extent.z) axis = 1;
+	else if (extent.z > extent.x) axis = 2;
+
+	// Sort by centroid along the chosen axis
+	std::sort(triangleIndices.begin() + start, triangleIndices.begin() + end,
+		[&](int a, int b) {
+			glm::vec3 ca = (triangles[a].v0 + triangles[a].v1 + triangles[a].v2) / 3.0f;
+			glm::vec3 cb = (triangles[b].v0 + triangles[b].v1 + triangles[b].v2) / 3.0f;
+			return ca[axis] < cb[axis];
+		});
+
+	int mid = start + count / 2;
+	node.leftChild = BuildBVHRecursive(triangles, triangleIndices, start, mid, outNodes);
+	node.rightChild = BuildBVHRecursive(triangles, triangleIndices, mid, end, outNodes);
+	node.triangleStartIndex = -1;
+	node.triangleCount = 0;
+
+	outNodes.push_back(node);
+	return static_cast<int>(outNodes.size()) - 1;
+}
+
 void HardwareRenderer::LoadModel(const std::string& filePath)
 {
 	if(filePath.substr(filePath.find_last_of(".") + 1) != "obj")
@@ -920,6 +986,8 @@ void HardwareRenderer::LoadModel(const std::string& filePath)
 	newModel.triangleStartIndex = m_sceneTriangles.size();
 
 	std::vector<Vertex> vertices;
+
+	std::vector<GPUTriangle> modelTriangles;
 
 	LoadObjFile(filePath, vertices);
 
@@ -995,7 +1063,7 @@ void HardwareRenderer::LoadModel(const std::string& filePath)
 		if (newTriangle.v2.z > maxZ)
 			maxZ = static_cast<int>(std::ceil(newTriangle.v2.z));
 
-		m_sceneTriangles.push_back(newTriangle);
+		modelTriangles.push_back(newTriangle);
 	}
 
 	//check the difference in the axis and make sure they are not 0
@@ -1021,8 +1089,22 @@ void HardwareRenderer::LoadModel(const std::string& filePath)
 	modelAABB.min = glm::vec3(minX, minY, minZ);
 	modelAABB.max = glm::vec3(maxX, maxY, maxZ);
 
+	ParentBVHNode parentNode;
+	parentNode.aabb = modelAABB;
+	parentNode.objectIndex = -1;
+
 	newModel.triangleCount = triangleCount;
-	newModel.boundingBox = modelAABB;
+	newModel.parentBVH = parentNode;
+
+	std::vector<int> modelTriangleIndices;
+	std::vector<GPUBVHNode> modelBVH;
+
+	//BuildBVHRecursive(modelTriangles, modelTriangleIndices, 0, modelTriangles.size(), modelBVH);
+
+	for (auto triangle : modelTriangles)
+	{
+		m_sceneTriangles.push_back(triangle);
+	}
 
 	m_models[filePath] = newModel;
 }

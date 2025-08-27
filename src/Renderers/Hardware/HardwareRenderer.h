@@ -76,7 +76,7 @@ struct Model
 	int triangleStartIndex = -1;
 	int triangleCount = 0;
 
-	GPUAABB boundingBox;
+	ParentBVHNode parentBVH;
 	int leftChild = -1;
 	int rightChild = -1;
 };
@@ -224,6 +224,7 @@ public:
 
 	void InitializeRenderer();
 
+	int BuildBVHRecursive(std::vector<GPUTriangle>& triangles, std::vector<int>& triangleIndices, int start, int end, std::vector<GPUBVHNode>& outNodes);
 	void LoadModel(const std::string& filePath);
 
 	InputManager* GetInputManager() { return &m_inputManager; }

@@ -29,11 +29,11 @@ void LoadObjFile(const std::string& filePath, std::vector<Vertex>& vertices)
             vertex.m_position[1] = attrib.vertices[3 * index.vertex_index + 1];
             vertex.m_position[2] = attrib.vertices[3 * index.vertex_index + 2];
 
-            if (attrib.texcoords.size() != 0)
+            /*if (attrib.texcoords.size() != 0)
             {
                 vertex.m_uvX = attrib.texcoords[2 * index.texcoord_index + 0];
                 vertex.m_uvY = 1.0f - attrib.texcoords[2 * index.texcoord_index + 1];
-            }
+            }*/
 
             if (attrib.normals.size() != 0)
             {
