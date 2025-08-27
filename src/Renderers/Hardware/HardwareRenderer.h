@@ -77,6 +77,8 @@ struct Model
 	int triangleCount = 0;
 
 	GPUAABB boundingBox;
+	int leftChild = -1;
+	int rightChild = -1;
 };
 
 struct SceneObject
@@ -168,8 +170,13 @@ private:
 	AllocatedBuffer m_sceneObjectBuffer;
 	std::vector<GPUTriangle> m_sceneTriangles;
 	AllocatedBuffer m_sceneTriangleBuffer;
-	std::vector<GPUAABB> m_sceneAABBs;
-	AllocatedBuffer m_sceneAABBBuffer;
+
+	std::vector<ParentBVHNode> m_parentBVH;
+	AllocatedBuffer m_parentBVHBuffer;
+
+	std::vector<GPUBVHNode> m_childBVH;
+	AllocatedBuffer m_childBVHBuffer;
+
 	std::vector<GPUMaterial> m_sceneMaterials;
 	AllocatedBuffer m_sceneMaterialBuffer;
 

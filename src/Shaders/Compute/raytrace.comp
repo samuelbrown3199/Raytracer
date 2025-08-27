@@ -53,8 +53,24 @@ bool IntervalSurrounds(Interval interval, float value)
 struct AABB
 {
     vec3 boxMin;
-    int objectIndex;
     vec3 boxMax;
+};
+
+struct ParentBVHNode
+{
+    AABB aabb;
+    int objectIndex;
+    int leftChild;
+    int rightChild;
+};
+
+struct BVHNode
+{
+    AABB aabb;
+    int leftChild;
+    int rightChild;
+    int triangleStartIndex;
+    int triangleCount;
 };
 
 struct Triangle
@@ -79,22 +95,27 @@ struct Object
 	mat4 inverseTransform;
 };
 
-layout(set=1, binding=0) readonly buffer AABBBuffer
+layout(std140, set=1, binding=0) readonly buffer ParentBVHNodeBuffer
 {
-    AABB aabbs[];
+    ParentBVHNode parentBVH[];
 };
 
-layout(std140, set=1, binding=1) readonly buffer TriangleBuffer
+layout(std140, set=1, binding=1) readonly buffer BVHNodeBuffer
+{
+    BVHNode bvhNodes[];
+};
+
+layout(std140, set=1, binding=2) readonly buffer TriangleBuffer
 {
 	Triangle triangles[];
 };
 
-layout(std140, set=1, binding=2) readonly buffer ObjectBuffer
+layout(std140, set=1, binding=3) readonly buffer ObjectBuffer
 {
     Object objects[];
 };
 
-layout(set=1, binding=3) readonly buffer MaterialBuffer
+layout(set=1, binding=4) readonly buffer MaterialBuffer
 {
     Material materials[];
 };
@@ -111,7 +132,7 @@ layout(push_constant) uniform constants
     float defocusAngle;
 
     vec3 cameraPosition;
-    int parentAABBCount;
+    int parentBVHCount;
 
     vec3 defocusU;
     int accumulateFrames;
@@ -123,6 +144,7 @@ layout(push_constant) uniform constants
     float sunStrength;
 
     vec3 sunColour;
+    int renderMode;
 
 } PushConstants;
 
@@ -298,14 +320,14 @@ bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec)
     rec.t = tMax;
     rec.hitObject = false;
 
-    for (int i = 0; i < PushConstants.parentAABBCount; i++)
+    for (int i = 0; i < PushConstants.parentBVHCount; i++)
     {
-        AABB targetAABB = aabbs[i];
+        ParentBVHNode targetBVH = parentBVH[i];
         Interval interval; interval.min = tMin; interval.max = closestSoFar;
 
-        if (IntersectAABB(r, targetAABB, interval))
+        if (IntersectAABB(r, targetBVH.aabb, interval))
         {
-            Object targetObject = objects[targetAABB.objectIndex];
+            Object targetObject = objects[targetBVH.objectIndex];
 
             int start = targetObject.triangleStartIndex;
             int end   = start + targetObject.triangleCount;
@@ -538,6 +560,70 @@ vec3 RayColour(Ray ray, inout RayHit rec, inout uint seed)
     return result;
 }
 
+void Pathtrace(ivec2 texelCoord, ivec2 size)
+{
+    vec4 newColour = vec4(0,0,0,1);
+    vec4 accumulatedColour = imageLoad(accumulationImage, texelCoord);
+
+    uint baseSeed = uint(texelCoord.x + texelCoord.y * size.x) + uint(PushConstants.frame) * 7919u; // prime multiplier
+    for (int i = 0; i < PushConstants.raysPerPixel; i++)
+    {
+        uint seed = baseSeed + uint(i) * 37u; // different for each sample
+        Ray ray = GetRay(texelCoord, seed);
+        RayHit rec;
+        newColour.rgb += RayColour(ray, rec, seed);
+    }
+    newColour.rgb /= float(PushConstants.raysPerPixel);
+
+
+    accumulatedColour.rgb += newColour.rgb;
+    imageStore(accumulationImage, texelCoord, accumulatedColour);
+
+    vec4 avgColour = PushConstants.accumulateFrames == 1 ? accumulatedColour : newColour;
+    avgColour.rgb /= PushConstants.accumulateFrames == 1 ? float(PushConstants.frame + 1) : 1;
+
+    avgColour[0] = LinearToGamma(avgColour[0]);
+    avgColour[1] = LinearToGamma(avgColour[1]);
+    avgColour[2] = LinearToGamma(avgColour[2]);
+
+    imageStore(outputImage, texelCoord, avgColour);
+}
+
+void RenderBoundingBoxes(ivec2 texelCoord, ivec2 size)
+{
+    vec4 outColour = vec4(0,0,0,1);
+    Ray ray = GetRay(texelCoord, 123u); // seed not important
+    RayHit rec;
+    for (int i = 0; i < PushConstants.parentBVHCount; i++)
+    {
+        ParentBVHNode targetBVH = parentBVH[i];
+        Interval interval; interval.min = 0.001; interval.max = 1e20;
+        if (IntersectAABB(ray, targetBVH.aabb, interval))
+        {
+            outColour = vec4(1,0,0,1);
+            break;
+        }
+    }
+    imageStore(outputImage, texelCoord, outColour);
+}
+
+void RenderDepth(ivec2 texelCoord, ivec2 size)
+{
+    Ray ray = GetRay(texelCoord, 123u); // seed not important for depth
+    RayHit rec;
+
+    if (GetHit(ray, 0.001, 1e20, rec))
+    {
+        float depth = length(rec.point - PushConstants.cameraPosition);
+        depth = clamp(depth / 50.0, 0.0, 1.0); // normalize
+        imageStore(outputImage, texelCoord, vec4(depth, depth, depth, 1.0));
+    }
+    else
+    {
+        imageStore(outputImage, texelCoord, vec4(0,0,0,1));
+    }
+}
+
 void main() 
 {
     ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
@@ -546,50 +632,11 @@ void main()
 
     if (texelCoord.x < size.x && texelCoord.y < size.y)
     {
-        vec4 newColour = vec4(0,0,0,1);
-        vec4 accumulatedColour = imageLoad(accumulationImage, texelCoord);
-
-        uint baseSeed = uint(texelCoord.x + texelCoord.y * size.x) + uint(PushConstants.frame) * 7919u; // prime multiplier
-        for (int i = 0; i < PushConstants.raysPerPixel; i++)
-        {
-            uint seed = baseSeed + uint(i) * 37u; // different for each sample
-            Ray ray = GetRay(texelCoord, seed);
-            RayHit rec;
-            newColour.rgb += RayColour(ray, rec, seed);
-        }
-        newColour.rgb /= float(PushConstants.raysPerPixel);
-
-
-        accumulatedColour.rgb += newColour.rgb;
-        imageStore(accumulationImage, texelCoord, accumulatedColour);
-
-        vec4 avgColour = PushConstants.accumulateFrames == 1 ? accumulatedColour : newColour;
-        avgColour.rgb /= PushConstants.accumulateFrames == 1 ? float(PushConstants.frame + 1) : 1;
-
-        avgColour[0] = LinearToGamma(avgColour[0]);
-        avgColour[1] = LinearToGamma(avgColour[1]);
-        avgColour[2] = LinearToGamma(avgColour[2]);
-
-        imageStore(outputImage, texelCoord, avgColour);
+        if(PushConstants.renderMode == 0)
+            Pathtrace(texelCoord, size);
+        else if(PushConstants.renderMode == 1)
+            RenderBoundingBoxes(texelCoord, size);
+        else if(PushConstants.renderMode == 2)
+            RenderDepth(texelCoord, size);
     }   
 }
-
-/*void main() 
-{
-    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
-    ivec2 size = imageSize(outputImage);
-
-    if (texelCoord.x < size.x && texelCoord.y < size.y)
-    {
-        Ray ray = GetRay(texelCoord, 123u); // seed not important for depth
-        RayHit rec;
-
-        if (GetHit(ray, 0.001, 1e20, rec)) {
-            float depth = length(rec.point - PushConstants.cameraPosition);
-            depth = clamp(depth / 5.0, 0.0, 1.0); // normalize
-            imageStore(outputImage, texelCoord, vec4(depth, depth, depth, 1.0));
-        } else {
-            imageStore(outputImage, texelCoord, vec4(0,0,0,1));
-        }
-    }
-}*/

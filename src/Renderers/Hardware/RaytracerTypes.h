@@ -31,7 +31,7 @@ struct RaytracePushConstants
     float defocusAngle;
 
 	glm::vec3 cameraPosition;
-    int parentAABBCount;
+    int parentBVHCount;
 
 	glm::vec3 defocusDiskU;
 	int accumulateFrames;
@@ -43,18 +43,27 @@ struct RaytracePushConstants
 	float sunIntensity = 5.0f;
 
 	glm::vec3 sunColour = glm::vec3(1.0, 0.95, 0.85);
-	float padding;
+	int renderMode = 0;
 };
 
 struct GPUAABB
 {
 	glm::vec3 min;
-	int objectIndex;
+	float padding2;
 	glm::vec3 max;
 	float padding;
 };
 
-struct BVHNode
+struct ParentBVHNode
+{
+	GPUAABB aabb;
+	int objectIndex;
+	int leftChild;
+	int rightChild;
+	int padding1;
+};
+
+struct GPUBVHNode
 {
 	GPUAABB aabb;
 

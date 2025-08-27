@@ -315,6 +315,7 @@ void HardwareRenderer::InitializeDescriptors()
 		builder.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 		builder.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 		builder.AddBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+		builder.AddBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 		m_sceneDescriptorLayout = builder.Build(m_device);
 	}
 
@@ -491,7 +492,6 @@ void HardwareRenderer::ConvertSceneObjectToGPUObject(const SceneObject& obj)
 	GPUAABB objectAABB = m_models[obj.modelName].boundingBox;
 	objectAABB.min = glm::vec4(objectMat * glm::vec4(objectAABB.min, 1.0f));
 	objectAABB.max = glm::vec4(objectMat * glm::vec4(objectAABB.max, 1.0f));
-	objectAABB.objectIndex = m_gpuSceneObjects.size();
 
 	gpuObject.inverseTransform = glm::inverse(objectMat);
 	gpuObject.materialIndex = obj.materialIndex;
@@ -499,9 +499,15 @@ void HardwareRenderer::ConvertSceneObjectToGPUObject(const SceneObject& obj)
 	gpuObject.triangleStartIndex = m_models[obj.modelName].triangleStartIndex;
 	gpuObject.triangleCount = m_models[obj.modelName].triangleCount;
 
-	m_gpuSceneObjects.push_back(gpuObject);
 
-	m_sceneAABBs.push_back(objectAABB);
+	ParentBVHNode parentNode;
+	parentNode.aabb = objectAABB;
+	parentNode.objectIndex = m_gpuSceneObjects.size();
+	parentNode.leftChild = m_models[obj.modelName].leftChild;
+	parentNode.rightChild = m_models[obj.modelName].rightChild;
+
+	m_gpuSceneObjects.push_back(gpuObject);
+	m_parentBVH.push_back(parentNode);
 }
 
 void HardwareRenderer::InitializeScene()
@@ -559,11 +565,16 @@ void HardwareRenderer::BufferSceneData()
 		ConvertSceneObjectToGPUObject(obj);
 	}
 
-	m_sceneAABBBuffer = CreateBuffer(sizeof(GPUAABB) * m_sceneAABBs.size()+1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneAABBBuffer");
+	m_parentBVHBuffer = CreateBuffer(sizeof(ParentBVHNode) * m_parentBVH.size()+1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneAABBBuffer");
 	void* data;
-	vmaMapMemory(m_allocator, m_sceneAABBBuffer.m_allocation, &data);
-	memcpy(data, m_sceneAABBs.data(), sizeof(GPUAABB) * m_sceneAABBs.size());
-	vmaUnmapMemory(m_allocator, m_sceneAABBBuffer.m_allocation);
+	vmaMapMemory(m_allocator, m_parentBVHBuffer.m_allocation, &data);
+	memcpy(data, m_parentBVH.data(), sizeof(ParentBVHNode) * m_parentBVH.size());
+	vmaUnmapMemory(m_allocator, m_parentBVHBuffer.m_allocation);
+
+	m_childBVHBuffer = CreateBuffer(sizeof(GPUBVHNode) * m_childBVH.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneChildBVHBuffer");
+	vmaMapMemory(m_allocator, m_childBVHBuffer.m_allocation, &data);
+	memcpy(data, m_childBVH.data(), sizeof(GPUBVHNode) * m_childBVH.size());
+	vmaUnmapMemory(m_allocator, m_childBVHBuffer.m_allocation);
 
 	m_sceneTriangleBuffer = CreateBuffer(sizeof(GPUTriangle) * m_sceneTriangles.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneSphereBuffer");
 	vmaMapMemory(m_allocator, m_sceneTriangleBuffer.m_allocation, &data);
@@ -581,10 +592,11 @@ void HardwareRenderer::BufferSceneData()
 	vmaUnmapMemory(m_allocator, m_sceneMaterialBuffer.m_allocation);
 
 	DescriptorWriter writer;
-	writer.WriteBuffer(0, m_sceneAABBBuffer.m_buffer, sizeof(GPUAABB) * m_sceneAABBs.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-	writer.WriteBuffer(1, m_sceneTriangleBuffer.m_buffer, sizeof(GPUTriangle) * m_sceneTriangles.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-	writer.WriteBuffer(2, m_sceneObjectBuffer.m_buffer, sizeof(GPUObject) * m_gpuSceneObjects.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-	writer.WriteBuffer(3, m_sceneMaterialBuffer.m_buffer, sizeof(GPUMaterial) * m_sceneMaterials.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(0, m_parentBVHBuffer.m_buffer, sizeof(ParentBVHNode) * m_parentBVH.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(1, m_childBVHBuffer.m_buffer, sizeof(GPUBVHNode) * m_childBVH.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(2, m_sceneTriangleBuffer.m_buffer, sizeof(GPUTriangle) * m_sceneTriangles.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(3, m_sceneObjectBuffer.m_buffer, sizeof(GPUObject) * m_gpuSceneObjects.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(4, m_sceneMaterialBuffer.m_buffer, sizeof(GPUMaterial) * m_sceneMaterials.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 	writer.UpdateSet(m_device, m_sceneDescriptor);
 }
 
@@ -619,7 +631,7 @@ void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
 	m_pushConstants.defocusAngle = m_camera.defocusAngle;
 	m_pushConstants.defocusDiskU = defocusRadius * u;
 	m_pushConstants.defocusDiskV = defocusRadius * v;
-	m_pushConstants.parentAABBCount = m_sceneAABBs.size();
+	m_pushConstants.parentBVHCount = m_parentBVH.size();
 
 	std::vector<VkDescriptorSet> sets;
 	sets.push_back(m_drawImageDescriptors);
@@ -813,6 +825,11 @@ void HardwareRenderer::MainLoop()
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 			ImGui::SeparatorText("Render Settings");
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
+			static int renderMode = 0;
+			if(ImGui::Combo("Render Mode", &renderMode, "Path Trace\0Show Bounding Boxes\0Show Depth\0"))
+				resetAccumulation = true;
+			m_pushConstants.renderMode = renderMode;
 
 			if(ImGui::DragInt("Rays Per Pixel", &m_pushConstants.raysPerPixel, 1, 1, 100))
 				resetAccumulation = true;
