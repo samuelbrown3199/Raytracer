@@ -555,12 +555,12 @@ void HardwareRenderer::InitializeScene()
 	std::string dragonPath = GetWorkingDirectory() + "\\Resources\\Models\\dragon-lowres.obj";
 	LoadModel(dragonPath);
 
-	AddSceneObject(spherePath, glm::vec3(-4, 1.1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), reflectiveMaterial);
-	AddSceneObject(spherePath, glm::vec3(0, 1.1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), glassMaterial);
-	AddSceneObject(spherePath, glm::vec3(4, 1.1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), diffuseMaterial);
+	AddSceneObject(spherePath, glm::vec3(-4, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), reflectiveMaterial);
+	AddSceneObject(spherePath, glm::vec3(0, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), glassMaterial);
+	AddSceneObject(spherePath, glm::vec3(4, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), diffuseMaterial);
 	AddSceneObject(spherePath, glm::vec3(0, 5, 0), glm::vec3(0, 0, 0), glm::vec3(0.5, 0.5, 0.5), emissiveMaterial);
 
-	AddSceneObject(dragonPath, glm::vec3(0, 0.9, -10), glm::vec3(0, 0, 0), glm::vec3(0.5, 0.5, 0.5), dullGoldMaterial);
+	AddSceneObject(dragonPath, glm::vec3(0, 1, -10), glm::vec3(0, 0, 0), glm::vec3(0.5, 0.5, 0.5), dullGoldMaterial);
 
 	AddSceneObject(testModelPath, glm::vec3(0, 0, 0), glm::vec3(0, 0, 0), glm::vec3(1000, 1, 1000), groundMaterial);
 
@@ -820,6 +820,7 @@ void HardwareRenderer::MainLoop()
 
 			std::string cameraPosStr = FormatString("Camera Position: (%.2f, %.2f, %.2f)", m_camera.cameraPosition.x, m_camera.cameraPosition.y, m_camera.cameraPosition.z);
 			ImGui::Text(cameraPosStr.c_str());
+			ImGui::Dummy(ImVec2(0, 3));
 
 			if(ImGui::DragFloat("Field of View", &m_camera.cameraFov, 0.1f, 1.0f, 179.0f))
 				resetAccumulation = true;
@@ -836,10 +837,8 @@ void HardwareRenderer::MainLoop()
 			ImGui::SeparatorText("Render Settings");
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
-			static int renderMode = 0;
-			if(ImGui::Combo("Render Mode", &renderMode, "Path Trace\0Show Bounding Boxes\0Show Depth\0"))
+			if(ImGui::Combo("Render Mode", &m_pushConstants.renderMode, "Path Trace\0Show Bounding Boxes\0Show Depth\0"))
 				resetAccumulation = true;
-			m_pushConstants.renderMode = renderMode;
 
 			if(ImGui::DragInt("Rays Per Pixel", &m_pushConstants.raysPerPixel, 1, 1, 100))
 				resetAccumulation = true;

@@ -4,23 +4,6 @@
 #include "Renderers/Hardware/HardwareRenderer.h"
 #include "Useful/Useful.h"
 
-int MainMenu()
-{
-	int mode = 0;
-
-	std::cout << "Select raytracer mode:\n\n";
-	std::cout << "0: Software renderer (output one image file)\n";
-	std::cout << "1: Hardware renderer (real-time rendering with Vulkan)\n";
-	std::cout << "\n";
-
-	std::cout << "----------------------------------------------\n\n";
-
-	std::cout << "Enter mode number: ";
-
-	std::cin >> mode;
-	return mode;
-}
-
 int SceneSelectionMenu()
 {
 	int scene = 0;
@@ -40,17 +23,15 @@ int SceneSelectionMenu()
 	return scene;
 }
 
-int main()
+int main(int argc, char* argv[])
 {
-	int mode = MainMenu();
-	std::cout << "\n\n";
-
-	switch (mode)
+	if (argc != 1)
 	{
-	case 0:
+		if (std::string(argv[1]) == "-SoftwareMode")
 		{
 			SoftwareRenderer renderer;
 
+			std::cout << "\n\n";
 			int scene = SceneSelectionMenu();
 			std::cout << "\n\n";
 
@@ -63,19 +44,15 @@ int main()
 			std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 			std::cin.get();
 		}
-		break;
-	case 1:
+		else
 		{
-			HardwareRenderer renderer;
-			renderer.InitializeRenderer();
-
-			std::cout << "Goodbye! :D\n";
+			std::cout << "Unknown argument: " << argv[1] << std::endl;
 		}
-		break;
-	default:
-		std::string errorMessage = "Unknown raytracer mode: " + mode;
-		std::cout << errorMessage << std::endl;
-		break;
+	}
+	else
+	{
+		HardwareRenderer renderer;
+		renderer.InitializeRenderer();
 	}
 
 	return 0;
