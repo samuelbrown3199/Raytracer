@@ -490,8 +490,29 @@ void HardwareRenderer::ConvertSceneObjectToGPUObject(const SceneObject& obj)
 	objectMat = glm::scale(objectMat, obj.scale);
 
 	GPUAABB objectAABB = m_models[obj.modelName].parentBVH.aabb;
-	objectAABB.min = glm::vec4(objectMat * glm::vec4(objectAABB.min, 1.0f));
-	objectAABB.max = glm::vec4(objectMat * glm::vec4(objectAABB.max, 1.0f));
+	glm::vec3 aabbMin = objectAABB.min;
+	glm::vec3 aabbMax = objectAABB.max;
+
+	glm::vec3 corners[8] = {
+		{aabbMin.x, aabbMin.y, aabbMin.z},
+		{aabbMax.x, aabbMin.y, aabbMin.z},
+		{aabbMin.x, aabbMax.y, aabbMin.z},
+		{aabbMax.x, aabbMax.y, aabbMin.z},
+		{aabbMin.x, aabbMin.y, aabbMax.z},
+		{aabbMax.x, aabbMin.y, aabbMax.z},
+		{aabbMin.x, aabbMax.y, aabbMax.z},
+		{aabbMax.x, aabbMax.y, aabbMax.z}
+	};
+
+	glm::vec3 newMin(FLT_MAX), newMax(-FLT_MAX);
+	for (int i = 0; i < 8; ++i) {
+		glm::vec3 transformed = glm::vec3(objectMat * glm::vec4(corners[i], 1.0f));
+		newMin = glm::min(newMin, transformed);
+		newMax = glm::max(newMax, transformed);
+	}
+
+	objectAABB.min = newMin;
+	objectAABB.max = newMax;
 
 	gpuObject.inverseTransform = glm::inverse(objectMat);
 	gpuObject.materialIndex = obj.materialIndex;
@@ -560,7 +581,7 @@ void HardwareRenderer::InitializeScene()
 	AddSceneObject(spherePath, glm::vec3(4, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), diffuseMaterial);
 	AddSceneObject(spherePath, glm::vec3(0, 5, 0), glm::vec3(0, 0, 0), glm::vec3(0.5, 0.5, 0.5), emissiveMaterial);
 
-	AddSceneObject(dragonPath, glm::vec3(0, 1, -10), glm::vec3(0, 0, 0), glm::vec3(0.5, 0.5, 0.5), dullGoldMaterial);
+	AddSceneObject(dragonPath, glm::vec3(0, 1, -10), glm::vec3(0, 180, 0), glm::vec3(0.5, 0.5, 0.5), dullGoldMaterial);
 
 	AddSceneObject(testModelPath, glm::vec3(0, 0, 0), glm::vec3(0, 0, 0), glm::vec3(1000, 1, 1000), groundMaterial);
 
@@ -856,7 +877,7 @@ void HardwareRenderer::MainLoop()
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
 			static float sunlightColour[3] = { m_pushConstants.sunColour[0], m_pushConstants.sunColour[1], m_pushConstants.sunColour[2] };
-			if (ImGui::DragFloat3("Sunlight Colour", sunlightColour, 0.01f, 0.0f, 1.0f))
+			if (ImGui::ColorEdit3("Sunlight Colour", sunlightColour))
 				resetAccumulation = true;
 
 			m_pushConstants.sunColour = glm::vec3(sunlightColour[0], sunlightColour[1], sunlightColour[2]);
