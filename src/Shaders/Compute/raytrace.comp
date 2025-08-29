@@ -146,6 +146,9 @@ layout(push_constant) uniform constants
     vec3 sunColour;
     int renderMode;
 
+    int triangleTestThreshold;
+    int bvhNodeTestThreshold;
+
 } PushConstants;
 
 bool IntersectAABB(Ray ray, AABB box, inout Interval t)
@@ -309,7 +312,16 @@ float LinearToGamma(float linearComponent)
     return 0;
 }
 
-bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec)
+bool HitChildNode(Ray r, int nodeIndex, Interval t)
+{
+    if(nodeIndex == -1)
+        return false;
+
+    BVHNode node = bvhNodes[nodeIndex];
+    return IntersectAABB(r, node.aabb, t);
+}
+
+/*bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec)
 {
     // Work with a normalized ray copy to make all t-space consistent.
     Ray r;
@@ -328,9 +340,12 @@ bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec)
         if (IntersectAABB(r, targetBVH.aabb, interval))
         {
             Object targetObject = objects[targetBVH.objectIndex];
+            int nodesToCheck[32];
 
             int start = targetObject.triangleStartIndex;
             int end   = start + targetObject.triangleCount;
+
+            bool needToTraverse = targetBVH.leftChild != -1 || targetBVH.rightChild != -1;
 
             // Transform ray into local space (use inverseTransform from object)
             vec4 localOrigin    = targetObject.inverseTransform * vec4(r.origin, 1.0);
@@ -376,16 +391,150 @@ bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec)
     }
 
     return rec.hitObject;
+}*/
+
+bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec, inout int triangleTests, inout int bvhNodeTests)
+{
+    Ray r;
+    r.origin = r_in.origin;
+    r.direction = normalize(r_in.direction);
+
+    float closestSoFar = tMax;
+    rec.t = tMax;
+    rec.hitObject = false;
+
+    for (int i = 0; i < PushConstants.parentBVHCount; i++)
+    {
+        ParentBVHNode targetBVH = parentBVH[i];
+        Interval interval; interval.min = tMin; interval.max = closestSoFar;
+
+        bvhNodeTests++;
+
+        if (!IntersectAABB(r, targetBVH.aabb, interval))
+            continue;
+
+        Object targetObject = objects[targetBVH.objectIndex];
+        int start = targetObject.triangleStartIndex;
+        int end   = start + targetObject.triangleCount;
+
+        // Transform ray into local space
+        vec4 localOrigin    = targetObject.inverseTransform * vec4(r.origin, 1.0);
+        vec4 localDirection = targetObject.inverseTransform * vec4(r.direction, 0.0);
+
+        Ray localRay;
+        localRay.origin    = localOrigin.xyz;
+        localRay.direction = normalize(localDirection.xyz);
+
+        mat4 objectTransform = inverse(targetObject.inverseTransform); // world transform
+        mat3 normalMatrix    = mat3(transpose(targetObject.inverseTransform));
+
+        // If no children, brute-force all triangles
+        if (targetBVH.leftChild == -1 && targetBVH.rightChild == -1)
+        {
+            for (int triIndex = start; triIndex < end; triIndex++)
+            {
+                triangleTests++;
+
+                Interval triInterval; 
+                triInterval.min = tMin; 
+                triInterval.max = 1e30;
+
+                RayHit tempRec;
+                if (IntersectTriangle(localRay, triangles[triIndex], triInterval, tempRec))
+                {
+                    vec3 worldPoint  = (objectTransform * vec4(tempRec.point, 1.0)).xyz;
+                    vec3 worldNormal = normalize(normalMatrix * tempRec.normal);
+                    float worldT = dot(worldPoint - r.origin, r.direction);
+
+                    if (worldT > tMin && worldT < closestSoFar)
+                    {
+                        closestSoFar  = worldT;
+                        rec.t         = worldT; 
+                        rec.point     = worldPoint;
+                        rec.normal    = worldNormal;
+                        rec.matIndex  = targetObject.materialIndex;
+                        rec.frontFace = dot(r.direction, worldNormal) < 0.0;
+                        rec.hitObject = true;
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Stack-based BVH traversal
+            int stack[32];
+            int stackPtr = 0;
+            if (targetBVH.leftChild != -1) stack[stackPtr++] = targetBVH.leftChild;
+            if (targetBVH.rightChild != -1) stack[stackPtr++] = targetBVH.rightChild;
+
+            while (stackPtr > 0)
+            {
+                int nodeIdx = stack[--stackPtr];
+                BVHNode node = bvhNodes[nodeIdx];
+
+                Interval nodeInterval; nodeInterval.min = tMin; nodeInterval.max = closestSoFar;
+
+                bvhNodeTests++;
+
+                if (!IntersectAABB(localRay, node.aabb, nodeInterval))
+                    continue;
+
+                // Leaf node: test triangles
+                if (node.leftChild == -1 && node.rightChild == -1)
+                {
+                    for (int t = 0; t < node.triangleCount; t++)
+                    {
+                        triangleTests++;
+
+                        int triIndex = node.triangleStartIndex + t;
+                        Interval triInterval; 
+                        triInterval.min = tMin; 
+                        triInterval.max = 1e30;
+
+                        RayHit tempRec;
+                        if (IntersectTriangle(localRay, triangles[triIndex], triInterval, tempRec))
+                        {
+                            vec3 worldPoint  = (objectTransform * vec4(tempRec.point, 1.0)).xyz;
+                            vec3 worldNormal = normalize(normalMatrix * tempRec.normal);
+                            float worldT = dot(worldPoint - r.origin, r.direction);
+
+                            if (worldT > tMin && worldT < closestSoFar)
+                            {
+                                closestSoFar  = worldT;
+                                rec.t         = worldT; 
+                                rec.point     = worldPoint;
+                                rec.normal    = worldNormal;
+                                rec.matIndex  = targetObject.materialIndex;
+                                rec.frontFace = dot(r.direction, worldNormal) < 0.0;
+                                rec.hitObject = true;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    //TODO prioritise child nodes based on distance to ray origin
+                    //Also skip any nodes that are further away than closest hit.
+                    
+
+                    if (node.leftChild != -1) stack[stackPtr++] = node.leftChild;
+                    if (node.rightChild != -1) stack[stackPtr++] = node.rightChild;
+                }
+            }
+        }
+    }
+
+    return rec.hitObject;
 }
 
-vec3 ShadowTransmission(Ray r, float tMin, float tMax)
+vec3 ShadowTransmission(Ray r, float tMin, float tMax, inout int triangleTests, inout int bvhNodeTests)
 {
     RayHit rec;
     vec3 transmission = vec3(1.0);
 
     // Trace the shadow ray for occluders
     int maxIterations = 4;
-    while (GetHit(r, tMin, tMax, rec))
+    while (GetHit(r, tMin, tMax, rec, triangleTests, bvhNodeTests))
     {
         maxIterations--;
         if(maxIterations == 0)
@@ -490,19 +639,24 @@ Ray GetRay(ivec2 pixelCoord, uint seed)
     return ray;
 }
 
-vec3 RayColour(Ray ray, inout RayHit rec, inout uint seed)
+vec3 RayColour(Ray ray, inout RayHit rec, inout uint seed, inout int triangleTests, inout int bvhNodeTests)
 {
     vec3 result = vec3(0.0);
     vec3 throughput = vec3(1.0);
 
     for (int bounce = 0; bounce < PushConstants.maxBounces; bounce++)
     {
-        GetHit(ray, 0.001, 1e20, rec);
+        GetHit(ray, 0.001, 1e20, rec, triangleTests, bvhNodeTests);
 
         if (!rec.hitObject)
         {
             vec3 bg = GetEnvironmentColour(ray);
             result += throughput * bg;
+            break;
+        }
+
+        if (!rec.frontFace)
+        {
             break;
         }
 
@@ -526,7 +680,7 @@ vec3 RayColour(Ray ray, inout RayHit rec, inout uint seed)
             shadowRay.origin = rec.point + rec.normal * 0.001;
             shadowRay.direction = -PushConstants.sunDir;
 
-            vec3 shadowTrans = ShadowTransmission(shadowRay, 0.001, 1e20);
+            vec3 shadowTrans = ShadowTransmission(shadowRay, 0.001, 1e20, triangleTests, bvhNodeTests);
             if (shadowTrans != vec3(0.0)) {
                 vec3 sun = PushConstants.sunStrength * PushConstants.sunColour;
                 const float INV_PI = 0.31830988618;
@@ -566,27 +720,48 @@ void Pathtrace(ivec2 texelCoord, ivec2 size)
     vec4 accumulatedColour = imageLoad(accumulationImage, texelCoord);
 
     uint baseSeed = uint(texelCoord.x + texelCoord.y * size.x) + uint(PushConstants.frame) * 7919u; // prime multiplier
+
+    int triangleTests = 0;
+    int bvhNodeTests = 0;
+
     for (int i = 0; i < PushConstants.raysPerPixel; i++)
     {
         uint seed = baseSeed + uint(i) * 37u; // different for each sample
         Ray ray = GetRay(texelCoord, seed);
         RayHit rec;
-        newColour.rgb += RayColour(ray, rec, seed);
+        newColour.rgb += RayColour(ray, rec, seed, triangleTests, bvhNodeTests);
     }
-    newColour.rgb /= float(PushConstants.raysPerPixel);
 
+    if(PushConstants.renderMode == 0)
+    {
+        newColour.rgb /= float(PushConstants.raysPerPixel);
 
-    accumulatedColour.rgb += newColour.rgb;
-    imageStore(accumulationImage, texelCoord, accumulatedColour);
+        accumulatedColour.rgb += newColour.rgb;
+        imageStore(accumulationImage, texelCoord, accumulatedColour);
 
-    vec4 avgColour = PushConstants.accumulateFrames == 1 ? accumulatedColour : newColour;
-    avgColour.rgb /= PushConstants.accumulateFrames == 1 ? float(PushConstants.frame + 1) : 1;
+        vec4 avgColour = PushConstants.accumulateFrames == 1 ? accumulatedColour : newColour;
+        avgColour.rgb /= PushConstants.accumulateFrames == 1 ? float(PushConstants.frame + 1) : 1;
 
-    avgColour[0] = LinearToGamma(avgColour[0]);
-    avgColour[1] = LinearToGamma(avgColour[1]);
-    avgColour[2] = LinearToGamma(avgColour[2]);
+        avgColour[0] = LinearToGamma(avgColour[0]);
+        avgColour[1] = LinearToGamma(avgColour[1]);
+        avgColour[2] = LinearToGamma(avgColour[2]);
 
-    imageStore(outputImage, texelCoord, avgColour);
+        imageStore(outputImage, texelCoord, avgColour);
+    }
+    else if (PushConstants.renderMode == 3 || PushConstants.renderMode == 4)
+    {
+        const int thresholdTests = PushConstants.renderMode == 3 ? PushConstants.triangleTestThreshold : PushConstants.bvhNodeTestThreshold;
+        int targetTestValue = PushConstants.renderMode == 3 ? triangleTests : bvhNodeTests;
+
+        int greyScale = int(float(targetTestValue) / float(thresholdTests) * 255.0);
+        greyScale = clamp(greyScale, 0, 255);
+        newColour = vec4(float(greyScale) / 255.0, float(greyScale) / 255.0, float(greyScale) / 255.0, 1.0);
+
+        if(triangleTests > thresholdTests)
+            newColour = vec4(1,0,0,1);
+
+        imageStore(outputImage, texelCoord, newColour);
+    }
 }
 
 void RenderBoundingBoxes(ivec2 texelCoord, ivec2 size)
@@ -612,7 +787,10 @@ void RenderDepth(ivec2 texelCoord, ivec2 size)
     Ray ray = GetRay(texelCoord, 123u); // seed not important for depth
     RayHit rec;
 
-    if (GetHit(ray, 0.001, 1e20, rec))
+    int triangleTests = 0;
+    int bvhNodeTests = 0;
+
+    if (GetHit(ray, 0.001, 1e20, rec, triangleTests, bvhNodeTests))
     {
         float depth = length(rec.point - PushConstants.cameraPosition);
         depth = clamp(depth / 50.0, 0.0, 1.0); // normalize
@@ -632,7 +810,7 @@ void main()
 
     if (texelCoord.x < size.x && texelCoord.y < size.y)
     {
-        if(PushConstants.renderMode == 0)
+        if(PushConstants.renderMode == 0 || PushConstants.renderMode == 3 || PushConstants.renderMode == 4)
             Pathtrace(texelCoord, size);
         else if(PushConstants.renderMode == 1)
             RenderBoundingBoxes(texelCoord, size);

@@ -224,7 +224,12 @@ public:
 
 	void InitializeRenderer();
 
-	int BuildBVHRecursive(std::vector<GPUTriangle>& triangles, std::vector<int>& triangleIndices, int start, int end, std::vector<GPUBVHNode>& outNodes);
+
+	int BuildBVHRecursive(
+		const std::vector<GPUTriangle>& triangles,
+		std::vector<int>& triangleIndices,
+		int start, int end,
+		std::vector<GPUBVHNode>& outNodes);
 	void LoadModel(const std::string& filePath);
 
 	InputManager* GetInputManager() { return &m_inputManager; }

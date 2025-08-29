@@ -1,5 +1,7 @@
 #include "HardwareRenderer.h"
 
+#include <numeric>
+
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
 #include <VkBootstrap.h>
@@ -581,7 +583,8 @@ void HardwareRenderer::InitializeScene()
 	AddSceneObject(spherePath, glm::vec3(4, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), diffuseMaterial);
 	AddSceneObject(spherePath, glm::vec3(0, 5, 0), glm::vec3(0, 0, 0), glm::vec3(0.5, 0.5, 0.5), emissiveMaterial);
 
-	AddSceneObject(dragonPath, glm::vec3(0, 1, -10), glm::vec3(0, 180, 0), glm::vec3(0.5, 0.5, 0.5), dullGoldMaterial);
+	//AddSceneObject(dragonPath, glm::vec3(0, 1, -10), glm::vec3(0, 180, 0), glm::vec3(0.5, 0.5, 0.5), dullGoldMaterial);
+	//AddSceneObject(dragonPath, glm::vec3(4, 1, -10), glm::vec3(0, 180, 0), glm::vec3(0.5, 0.5, 0.5), glassMaterial);
 
 	AddSceneObject(testModelPath, glm::vec3(0, 0, 0), glm::vec3(0, 0, 0), glm::vec3(1000, 1, 1000), groundMaterial);
 
@@ -858,7 +861,7 @@ void HardwareRenderer::MainLoop()
 			ImGui::SeparatorText("Render Settings");
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
-			if(ImGui::Combo("Render Mode", &m_pushConstants.renderMode, "Path Trace\0Show Bounding Boxes\0Show Depth\0"))
+			if(ImGui::Combo("Render Mode", &m_pushConstants.renderMode, "Path Trace\0Show Bounding Boxes\0Show Depth\0Triangle Tests\0BVH Node Tests\0"))
 				resetAccumulation = true;
 
 			if(ImGui::DragInt("Rays Per Pixel", &m_pushConstants.raysPerPixel, 1, 1, 100))
@@ -873,6 +876,17 @@ void HardwareRenderer::MainLoop()
 				resetAccumulation = true;
 			}
 			m_pushConstants.accumulateFrames = accumlateFrames;
+
+			if (m_pushConstants.renderMode == 3)
+			{
+				if (ImGui::DragInt("Max Triangle Tests", &m_pushConstants.triangleTestThreshold, 1, 1, 10000))
+					resetAccumulation = true;
+			}
+			else if (m_pushConstants.renderMode == 4)
+			{
+				if (ImGui::DragInt("Max BVH Node Tests", &m_pushConstants.bvhNodeTestThreshold, 1, 1, 10000))
+					resetAccumulation = true;
+			}
 
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
@@ -927,75 +941,29 @@ void HardwareRenderer::InitializeRenderer()
 	MainLoop();
 }
 
-int HardwareRenderer::BuildBVHRecursive(std::vector<GPUTriangle>& triangles, std::vector<int>& triangleIndices, int start, int end, std::vector<GPUBVHNode>& outNodes)
+int HardwareRenderer::BuildBVHRecursive(
+	const std::vector<GPUTriangle>& triangles,
+	std::vector<int>& triangleIndices,
+	int start, int end,                       
+	std::vector<GPUBVHNode>& outNodes)
 {
-	// Compute AABB for this node
-	glm::vec3 min(FLT_MAX), max(-FLT_MAX);
-	for (int i = start; i < end; ++i) {
-		const GPUTriangle& tri = triangles[triangleIndices[i]];
-		min = glm::min(min, glm::min(tri.v0, glm::min(tri.v1, tri.v2)));
-		max = glm::max(max, glm::max(tri.v0, glm::max(tri.v1, tri.v2)));
-	}
-
-	GPUBVHNode node;
-	node.aabb.min = min;
-	node.aabb.max = max;
-
-	int count = end - start;
-	if (count <= 2) {
-		// Leaf node
-		node.leftChild = -1;
-		node.rightChild = -1;
-		node.triangleStartIndex = triangleIndices[start];
-		node.triangleCount = count;
-		outNodes.push_back(node);
-		return static_cast<int>(outNodes.size()) - 1;
-	}
-
-	// Compute centroid bounds and split axis
-	glm::vec3 centroidMin(FLT_MAX), centroidMax(-FLT_MAX);
-	for (int i = start; i < end; ++i) {
-		const GPUTriangle& tri = triangles[triangleIndices[i]];
-		glm::vec3 centroid = (tri.v0 + tri.v1 + tri.v2) / 3.0f;
-		centroidMin = glm::min(centroidMin, centroid);
-		centroidMax = glm::max(centroidMax, centroid);
-	}
-	glm::vec3 extent = centroidMax - centroidMin;
-	int axis = 0;
-	if (extent.y > extent.x && extent.y > extent.z) axis = 1;
-	else if (extent.z > extent.x) axis = 2;
-
-	// Sort by centroid along the chosen axis
-	std::sort(triangleIndices.begin() + start, triangleIndices.begin() + end,
-		[&](int a, int b) {
-			glm::vec3 ca = (triangles[a].v0 + triangles[a].v1 + triangles[a].v2) / 3.0f;
-			glm::vec3 cb = (triangles[b].v0 + triangles[b].v1 + triangles[b].v2) / 3.0f;
-			return ca[axis] < cb[axis];
-		});
-
-	int mid = start + count / 2;
-	node.leftChild = BuildBVHRecursive(triangles, triangleIndices, start, mid, outNodes);
-	node.rightChild = BuildBVHRecursive(triangles, triangleIndices, mid, end, outNodes);
-	node.triangleStartIndex = -1;
-	node.triangleCount = 0;
-
-	outNodes.push_back(node);
-	return static_cast<int>(outNodes.size()) - 1;
+	//Function TBD, referring to https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/ for guidance
+	return -1;
 }
 
 void HardwareRenderer::LoadModel(const std::string& filePath)
 {
-	if(filePath.substr(filePath.find_last_of(".") + 1) != "obj")
+	if (filePath.substr(filePath.find_last_of(".") + 1) != "obj")
 	{
 		throw std::exception("Only .obj files are supported.");
 	}
 
-	if(m_models.find(filePath) != m_models.end())
+	if (m_models.find(filePath) != m_models.end())
 	{
 		return;
 	}
 
-	if(FileExists(filePath) == false)
+	if (FileExists(filePath) == false)
 	{
 		std::string error = filePath + " does not exist.";
 		throw std::exception(error.c_str());
@@ -1003,10 +971,9 @@ void HardwareRenderer::LoadModel(const std::string& filePath)
 
 	Model newModel;
 	GPUAABB modelAABB;
-	newModel.triangleStartIndex = m_sceneTriangles.size();
+	newModel.triangleStartIndex = static_cast<int>(m_sceneTriangles.size());
 
 	std::vector<Vertex> vertices;
-
 	std::vector<GPUTriangle> modelTriangles;
 
 	LoadObjFile(filePath, vertices);
@@ -1018,15 +985,17 @@ void HardwareRenderer::LoadModel(const std::string& filePath)
 	float maxY = INT_MIN;
 	float maxZ = INT_MIN;
 
-	int triangleCount = vertices.size() / 3;
-	for(int i = 0; i < vertices.size(); i += 3)
+	int triangleCount = static_cast<int>(vertices.size() / 3);
+	for (int i = 0; i < (int)vertices.size(); i += 3)
 	{
 		GPUTriangle newTriangle;
 		newTriangle.v0 = vertices[i].m_position;
 		newTriangle.v1 = vertices[i + 1].m_position;
 		newTriangle.v2 = vertices[i + 2].m_position;
 
-		if(vertices[i].m_normal != glm::vec3(0.0f) && vertices[i + 1].m_normal != glm::vec3(0.0f) && vertices[i + 2].m_normal != glm::vec3(0.0f))
+		if (vertices[i].m_normal != glm::vec3(0.0f) &&
+			vertices[i + 1].m_normal != glm::vec3(0.0f) &&
+			vertices[i + 2].m_normal != glm::vec3(0.0f))
 		{
 			newTriangle.n0 = glm::normalize(vertices[i].m_normal);
 			newTriangle.n1 = glm::normalize(vertices[i + 1].m_normal);
@@ -1037,74 +1006,43 @@ void HardwareRenderer::LoadModel(const std::string& filePath)
 			glm::vec3 edge1 = newTriangle.v1 - newTriangle.v0;
 			glm::vec3 edge2 = newTriangle.v2 - newTriangle.v0;
 			glm::vec3 faceNormal = glm::normalize(glm::cross(edge1, edge2));
-
 			newTriangle.n0 = faceNormal;
 			newTriangle.n1 = faceNormal;
 			newTriangle.n2 = faceNormal;
 		}
 
-		//Check all current bound values and update if needed
-		if(newTriangle.v0.x < minX)
-			minX = static_cast<int>(std::floor(newTriangle.v0.x));
-		if (newTriangle.v0.y < minY)
-			minY = static_cast<int>(std::floor(newTriangle.v0.y));
-		if (newTriangle.v0.z < minZ)
-			minZ = static_cast<int>(std::floor(newTriangle.v0.z));
-		if (newTriangle.v0.x > maxX)
-			maxX = static_cast<int>(std::ceil(newTriangle.v0.x));
-		if (newTriangle.v0.y > maxY)
-			maxY = static_cast<int>(std::ceil(newTriangle.v0.y));
-		if (newTriangle.v0.z > maxZ)
-			maxZ = static_cast<int>(std::ceil(newTriangle.v0.z));
+		// update bounding ints
+		if (newTriangle.v0.x < minX) minX = static_cast<int>(std::floor(newTriangle.v0.x));
+		if (newTriangle.v0.y < minY) minY = static_cast<int>(std::floor(newTriangle.v0.y));
+		if (newTriangle.v0.z < minZ) minZ = static_cast<int>(std::floor(newTriangle.v0.z));
+		if (newTriangle.v0.x > maxX) maxX = static_cast<int>(std::ceil(newTriangle.v0.x));
+		if (newTriangle.v0.y > maxY) maxY = static_cast<int>(std::ceil(newTriangle.v0.y));
+		if (newTriangle.v0.z > maxZ) maxZ = static_cast<int>(std::ceil(newTriangle.v0.z));
 
-		if (newTriangle.v1.x < minX)
-			minX = static_cast<int>(std::floor(newTriangle.v1.x));
-		if (newTriangle.v1.y < minY)
-			minY = static_cast<int>(std::floor(newTriangle.v1.y));
-		if (newTriangle.v1.z < minZ)
-			minZ = static_cast<int>(std::floor(newTriangle.v1.z));
-		if (newTriangle.v1.x > maxX)
-			maxX = static_cast<int>(std::ceil(newTriangle.v1.x));
-		if (newTriangle.v1.y > maxY)
-			maxY = static_cast<int>(std::ceil(newTriangle.v1.y));
-		if (newTriangle.v1.z > maxZ)
-			maxZ = static_cast<int>(std::ceil(newTriangle.v1.z));
+		if (newTriangle.v1.x < minX) minX = static_cast<int>(std::floor(newTriangle.v1.x));
+		if (newTriangle.v1.y < minY) minY = static_cast<int>(std::floor(newTriangle.v1.y));
+		if (newTriangle.v1.z < minZ) minZ = static_cast<int>(std::floor(newTriangle.v1.z));
+		if (newTriangle.v1.x > maxX) maxX = static_cast<int>(std::ceil(newTriangle.v1.x));
+		if (newTriangle.v1.y > maxY) maxY = static_cast<int>(std::ceil(newTriangle.v1.y));
+		if (newTriangle.v1.z > maxZ) maxZ = static_cast<int>(std::ceil(newTriangle.v1.z));
 
-		if (newTriangle.v2.x < minX)
-			minX = static_cast<int>(std::floor(newTriangle.v2.x));
-		if (newTriangle.v2.y < minY)
-			minY = static_cast<int>(std::floor(newTriangle.v2.y));
-		if (newTriangle.v2.z < minZ)
-			minZ = static_cast<int>(std::floor(newTriangle.v2.z));
-		if (newTriangle.v2.x > maxX)
-			maxX = static_cast<int>(std::ceil(newTriangle.v2.x));
-		if (newTriangle.v2.y > maxY)
-			maxY = static_cast<int>(std::ceil(newTriangle.v2.y));
-		if (newTriangle.v2.z > maxZ)
-			maxZ = static_cast<int>(std::ceil(newTriangle.v2.z));
+		if (newTriangle.v2.x < minX) minX = static_cast<int>(std::floor(newTriangle.v2.x));
+		if (newTriangle.v2.y < minY) minY = static_cast<int>(std::floor(newTriangle.v2.y));
+		if (newTriangle.v2.z < minZ) minZ = static_cast<int>(std::floor(newTriangle.v2.z));
+		if (newTriangle.v2.x > maxX) maxX = static_cast<int>(std::ceil(newTriangle.v2.x));
+		if (newTriangle.v2.y > maxY) maxY = static_cast<int>(std::ceil(newTriangle.v2.y));
+		if (newTriangle.v2.z > maxZ) maxZ = static_cast<int>(std::ceil(newTriangle.v2.z));
 
 		modelTriangles.push_back(newTriangle);
 	}
 
-	//check the difference in the axis and make sure they are not 0
+	// ensure non-zero extents
 	float xDiff = maxX - minX;
 	float yDiff = maxY - minY;
 	float zDiff = maxZ - minZ;
-	if (xDiff == 0)
-	{
-		maxX += 1;
-		minX -= 1;
-	}
-	if (yDiff == 0)
-	{
-		maxY += 1;
-		minY -= 1;
-	}
-	if (zDiff == 0)
-	{
-		maxZ += 1;
-		minZ -= 1;
-	}
+	if (xDiff == 0) { maxX += 1; minX -= 1; }
+	if (yDiff == 0) { maxY += 1; minY -= 1; }
+	if (zDiff == 0) { maxZ += 1; minZ -= 1; }
 
 	modelAABB.min = glm::vec3(minX, minY, minZ);
 	modelAABB.max = glm::vec3(maxX, maxY, maxZ);
@@ -1112,20 +1050,61 @@ void HardwareRenderer::LoadModel(const std::string& filePath)
 	ParentBVHNode parentNode;
 	parentNode.aabb = modelAABB;
 	parentNode.objectIndex = -1;
+	parentNode.leftChild = -1;
+	parentNode.rightChild = -1;
 
 	newModel.triangleCount = triangleCount;
 	newModel.parentBVH = parentNode;
 
-	std::vector<int> modelTriangleIndices;
+	std::vector<int> modelTriangleIndices(modelTriangles.size());
+	std::iota(modelTriangleIndices.begin(), modelTriangleIndices.end(), 0);
+
 	std::vector<GPUBVHNode> modelBVH;
+	if (!modelTriangles.empty())
+		BuildBVHRecursive(modelTriangles, modelTriangleIndices, 0, static_cast<int>(modelTriangleIndices.size()), modelBVH);
 
-	//BuildBVHRecursive(modelTriangles, modelTriangleIndices, 0, modelTriangles.size(), modelBVH);
-
-	for (auto triangle : modelTriangles)
+	// modelTriangleIndices now contains the final permutation your BVH expects.
+	// Reorder triangles exactly once according to modelTriangleIndices:
+	std::vector<GPUTriangle> reorderedTriangles;
+	reorderedTriangles.reserve(modelTriangles.size());
+	for (size_t i = 0; i < modelTriangleIndices.size(); ++i)
 	{
-		m_sceneTriangles.push_back(triangle);
+		reorderedTriangles.push_back(modelTriangles[modelTriangleIndices[i]]);
 	}
 
+	// Append reordered triangles to the global scene buffer
+	int globalTriangleOffset = static_cast<int>(m_sceneTriangles.size());
+	for (auto& tri : reorderedTriangles)
+		m_sceneTriangles.push_back(tri);
+
+	// Now convert modelBVH node local starts into global indices and update child indices
+	int bvhGlobalOffset = static_cast<int>(m_childBVH.size());
+	for (auto& node : modelBVH)
+	{
+		node.triangleStartIndex = globalTriangleOffset + node.triangleStartIndex;
+
+		if (node.leftChild != -1)  node.leftChild += bvhGlobalOffset;
+		if (node.rightChild != -1) node.rightChild += bvhGlobalOffset;
+
+		m_childBVH.push_back(node);
+	}
+
+	// Root node mapping into parentNode
+	int rootLocalIndex = -1;
+	if (!modelBVH.empty())
+		rootLocalIndex = 0; // BuildBVHRecursive appended root as first node
+
+	if (rootLocalIndex != -1)
+	{
+		parentNode.leftChild = modelBVH[rootLocalIndex].leftChild;
+		parentNode.rightChild = modelBVH[rootLocalIndex].rightChild;
+	}
+
+	newModel.triangleStartIndex = globalTriangleOffset;
+	newModel.triangleCount = static_cast<int>(reorderedTriangles.size());
+
+	// store parent BVH and model
+	newModel.parentBVH = parentNode;
 	m_models[filePath] = newModel;
 }
 

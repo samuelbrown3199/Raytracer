@@ -44,6 +44,11 @@ struct RaytracePushConstants
 
 	glm::vec3 sunColour = glm::vec3(1.0, 0.95, 0.85);
 	int renderMode = 0;
+
+	int triangleTestThreshold = 150;
+	int bvhNodeTestThreshold = 10;
+	int padding1;
+	int padding2;
 };
 
 struct GPUAABB
@@ -52,6 +57,17 @@ struct GPUAABB
 	float padding2;
 	glm::vec3 max;
 	float padding;
+
+	int GetLongestAxis() const
+	{
+		glm::vec3 extents = max - min;
+		if (extents.x > extents.y && extents.x > extents.z)
+			return 0; // X axis
+		else if (extents.y > extents.z)
+			return 1; // Y axis
+		else
+			return 2; // Z axis
+	}
 };
 
 struct ParentBVHNode
@@ -71,16 +87,6 @@ struct GPUBVHNode
 	int rightChild;
 	int triangleStartIndex;
 	int triangleCount;
-};
-
-struct GPUSphere
-{
-	glm::vec3 center;
-	float radius;
-	int materialIndex;
-	float padding;
-	float padding2;
-	float padding3;
 };
 
 struct GPUTriangle
