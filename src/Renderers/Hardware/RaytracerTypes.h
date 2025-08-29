@@ -46,7 +46,7 @@ struct RaytracePushConstants
 	int renderMode = 0;
 
 	int triangleTestThreshold = 150;
-	int bvhNodeTestThreshold = 10;
+	int bvhNodeTestThreshold = 120;
 	float depthDebugScale = 50.0f;
 	int padding2;
 };

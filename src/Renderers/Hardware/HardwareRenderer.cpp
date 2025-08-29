@@ -572,19 +572,19 @@ void HardwareRenderer::InitializeScene()
 	std::string testModelPath = GetWorkingDirectory() + "\\Resources\\Models\\flat_quad.obj";
 	LoadModel(testModelPath);
 
-	//std::string spherePath = GetWorkingDirectory() + "\\Resources\\Models\\icosphere.obj";
-	//LoadModel(spherePath);
+	std::string spherePath = GetWorkingDirectory() + "\\Resources\\Models\\icosphere.obj";
+	LoadModel(spherePath);
 
-	std::string dragonPath = GetWorkingDirectory() + "\\Resources\\Models\\dragon-lowres.obj";
+	std::string dragonPath = GetWorkingDirectory() + "\\Resources\\Models\\dragon_lowres.obj";
 	LoadModel(dragonPath);
 
-	//AddSceneObject(spherePath, glm::vec3(-4, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), reflectiveMaterial);
-	//AddSceneObject(spherePath, glm::vec3(0, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), glassMaterial);
-	//AddSceneObject(spherePath, glm::vec3(4, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), diffuseMaterial);
-	//AddSceneObject(spherePath, glm::vec3(0, 5, 0), glm::vec3(0, 0, 0), glm::vec3(0.5, 0.5, 0.5), emissiveMaterial);
+	AddSceneObject(spherePath, glm::vec3(-4, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), reflectiveMaterial);
+	AddSceneObject(spherePath, glm::vec3(0, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), glassMaterial);
+	AddSceneObject(spherePath, glm::vec3(4, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), diffuseMaterial);
+	AddSceneObject(spherePath, glm::vec3(0, 5, 0), glm::vec3(0, 0, 0), glm::vec3(0.5, 0.5, 0.5), emissiveMaterial);
 
 	AddSceneObject(dragonPath, glm::vec3(0, 1, -10), glm::vec3(0, 180, 0), glm::vec3(0.5, 0.5, 0.5), dullGoldMaterial);
-	//AddSceneObject(dragonPath, glm::vec3(4, 1, -10), glm::vec3(0, 180, 0), glm::vec3(0.5, 0.5, 0.5), glassMaterial);
+	AddSceneObject(dragonPath, glm::vec3(4, 1, -10), glm::vec3(0, 180, 0), glm::vec3(0.5, 0.5, 0.5), glassMaterial);
 
 	AddSceneObject(testModelPath, glm::vec3(0, 0, 0), glm::vec3(0, 0, 0), glm::vec3(1000, 1, 1000), groundMaterial);
 
@@ -1209,8 +1209,8 @@ void HardwareRenderer::LoadModel(const std::string& filePath)
 	int triangleGlobalOffset = static_cast<int>(m_sceneTriangles.size());
 	for (auto& node : modelBVH)
 	{
-		node.leftChild += bvhGlobalOffset;
-		node.rightChild += bvhGlobalOffset;
+		node.leftChild = node.leftChild != -1 ? node.leftChild + bvhGlobalOffset : -1;
+		node.rightChild = node.rightChild != -1 ? node.rightChild + bvhGlobalOffset : -1;
 
 		node.triangleStartIndex += triangleGlobalOffset;
 
