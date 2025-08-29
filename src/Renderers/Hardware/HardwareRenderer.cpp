@@ -877,6 +877,12 @@ void HardwareRenderer::MainLoop()
 			}
 			m_pushConstants.accumulateFrames = accumlateFrames;
 
+			if (m_pushConstants.renderMode == 2)
+			{
+				if (ImGui::DragFloat("Depth Scale", &m_pushConstants.depthDebugScale, 0.1f, 0.1f, 100.0f))
+					resetAccumulation = true;
+			}
+
 			if (m_pushConstants.renderMode == 3)
 			{
 				if (ImGui::DragInt("Max Triangle Tests", &m_pushConstants.triangleTestThreshold, 1, 1, 10000))

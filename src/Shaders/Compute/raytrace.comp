@@ -148,6 +148,7 @@ layout(push_constant) uniform constants
 
     int triangleTestThreshold;
     int bvhNodeTestThreshold;
+    float depthDebugScale;
 
 } PushConstants;
 
@@ -793,7 +794,7 @@ void RenderDepth(ivec2 texelCoord, ivec2 size)
     if (GetHit(ray, 0.001, 1e20, rec, triangleTests, bvhNodeTests))
     {
         float depth = length(rec.point - PushConstants.cameraPosition);
-        depth = clamp(depth / 50.0, 0.0, 1.0); // normalize
+        depth = clamp(depth / PushConstants.depthDebugScale, 0.0, 1.0); // normalize
         imageStore(outputImage, texelCoord, vec4(depth, depth, depth, 1.0));
     }
     else
