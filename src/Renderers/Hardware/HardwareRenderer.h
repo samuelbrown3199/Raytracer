@@ -77,8 +77,6 @@ struct Model
 	int triangleCount = 0;
 
 	ParentBVHNode parentBVH;
-	int leftChild = -1;
-	int rightChild = -1;
 };
 
 struct SceneObject
@@ -225,11 +223,10 @@ public:
 	void InitializeRenderer();
 
 
-	int BuildBVHRecursive(
-		const std::vector<GPUTriangle>& triangles,
-		std::vector<int>& triangleIndices,
-		int start, int end,
-		std::vector<GPUBVHNode>& outNodes);
+	void BuildBVH(std::vector<GPUTriangle>& triangles, std::vector<GPUBVHNode>& outNodes, ParentBVHNode& parentNode);
+	void SplitBVHNode(std::vector<GPUTriangle>& triangles, std::vector<GPUBVHNode>& outNodes, int& currentNodeIndex);
+	void ExpandNodeAABB(std::vector<GPUTriangle>& triangles, GPUBVHNode& child);
+
 	void LoadModel(const std::string& filePath);
 
 	InputManager* GetInputManager() { return &m_inputManager; }

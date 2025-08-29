@@ -115,6 +115,9 @@ struct GPUTriangle
 
 	glm::vec3 n2;
 	float padding8;
+
+	glm::vec3 triCentroid;
+	float padding9;
 };
 
 struct GPUObject

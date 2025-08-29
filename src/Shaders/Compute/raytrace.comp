@@ -84,6 +84,7 @@ struct Triangle
     vec3 n0;
     vec3 n1;
     vec3 n2;
+    vec3 triCentroid;
 };
 
 struct Object
@@ -473,7 +474,7 @@ bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec, inout int triangle
                 int nodeIdx = stack[--stackPtr];
                 BVHNode node = bvhNodes[nodeIdx];
 
-                Interval nodeInterval; nodeInterval.min = tMin; nodeInterval.max = closestSoFar;
+                Interval nodeInterval; nodeInterval.min = tMin; nodeInterval.max = 1e30;
 
                 bvhNodeTests++;
 
