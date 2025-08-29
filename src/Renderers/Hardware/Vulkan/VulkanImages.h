@@ -15,3 +15,5 @@ AllocatedImage CreateImage(HardwareRenderer* renderer, void* data, VkExtent3D si
 void DestroyImage(HardwareRenderer* renderer, AllocatedImage* img);
 
 void UpdateImage(HardwareRenderer* renderer, AllocatedImage* img, void* data, VkExtent3D size, VkImageLayout finalLayout);
+
+void CopyImageToBuffer(VkCommandBuffer cmd, VkImage image, VkBuffer buffer, VkExtent3D size);

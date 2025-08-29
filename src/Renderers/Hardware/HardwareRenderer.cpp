@@ -7,6 +7,9 @@
 #include <VkBootstrap.h>
 #include <SDL3/SDL_vulkan.h>
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 #include "../../Useful/Useful.h"
 #include "Vulkan/VulkanImages.h"
 #include "Vulkan/VulkanInitialisers.h"
@@ -18,6 +21,7 @@
 #include "../ModelLoader.h"
 
 #include "CameraController.h"
+#include "../../Useful/Useful.h"
 
 void HardwareRenderer::InitializeVulkan()
 {
@@ -927,6 +931,22 @@ void HardwareRenderer::MainLoop()
 			if (ImGui::DragFloat("Sunlight Intensity", &m_pushConstants.sunIntensity, 0.01f, 0.0f, 10.0f))
 				resetAccumulation = true;
 
+			/*ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
+			ImGui::SeparatorText("Render Output Settings");
+			ImGui::Dummy(ImVec2(0.0f, 5.0f));
+			ImGui::Text("This will let the path tracer render and write the file out to disk.");
+			ImGui::Text("This will block the main thread until the render is complete.");
+			ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
+			static int framesToRender = 1000;
+			ImGui::DragInt("Frames to Render", &framesToRender, 1, 1, 100000);
+
+			if (ImGui::Button("Produce Render"))
+			{
+				ProduceRender(framesToRender);
+			}*/
+
 			m_bRefreshAccumulation = m_bRefreshAccumulation || resetAccumulation;
 
 			ImGui::End();
@@ -953,6 +973,106 @@ void HardwareRenderer::MainLoop()
 	}
 }
 
+void HardwareRenderer::ProduceRender(int frameCount)
+{
+	float renderPercentage = 0.0f;
+	float percentageStep = 100.0f / frameCount;
+
+	for(int i = 0; i < frameCount; ++i)
+	{
+		RenderFrame();
+		m_pushConstants.frame++;
+
+		renderPercentage += (i+1) * percentageStep;
+		std::cout << "\rRendering: " << (int)renderPercentage << "%.2f   " << std::flush;
+	}
+
+	WriteDrawImageToFile();
+}
+
+void HardwareRenderer::WriteDrawImageToFile()
+{
+	const uint32_t width = m_drawImage.m_imageExtent.width;
+	const uint32_t height = m_drawImage.m_imageExtent.height;
+	const size_t pixelCount = size_t(width) * size_t(height);
+
+	// CORRECT: 4 floats per pixel (R32G32B32A32_SFLOAT)
+	const VkDeviceSize floatPixelSize = sizeof(float) * 4;
+	const VkDeviceSize bufferSize = floatPixelSize * pixelCount; // <-- no extra *4
+
+	AllocatedBuffer stagingBuffer = CreateBuffer(
+		bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VMA_MEMORY_USAGE_GPU_TO_CPU,
+		"StagingBuffer"
+	);
+
+	{
+		std::lock_guard<std::mutex> lock(m_immediateSubmitMutex);
+		ImmediateSubmit([&](VkCommandBuffer cmd)
+			{
+				TransitionImage(cmd, m_drawImage.m_image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+				CopyImageToBuffer(cmd, m_drawImage.m_image, stagingBuffer.m_buffer, m_drawImage.m_imageExtent);
+				TransitionImage(cmd, m_drawImage.m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+			});
+	}
+
+	// Ensure GPU writes are visible to CPU if memory is non-coherent
+	vmaInvalidateAllocation(m_allocator, stagingBuffer.m_allocation, 0, VK_WHOLE_SIZE);
+
+	void* mappedData = nullptr;
+	vmaMapMemory(m_allocator, stagingBuffer.m_allocation, &mappedData);
+	const float* floatPixels = reinterpret_cast<const float*>(mappedData);
+
+	std::vector<uint8_t> imageData(pixelCount * 4);
+
+	for (size_t i = 0; i < pixelCount; ++i)
+	{
+		float r = floatPixels[i * 4 + 0];
+		float g = floatPixels[i * 4 + 1];
+		float b = floatPixels[i * 4 + 2];
+		float a = floatPixels[i * 4 + 3];
+
+		// clamp to [0,1]
+		r = std::min(std::max(r, 0.0f), 1.0f);
+		g = std::min(std::max(g, 0.0f), 1.0f);
+		b = std::min(std::max(b, 0.0f), 1.0f);
+		a = std::min(std::max(a, 0.0f), 1.0f);
+
+		// convert to 0..255 with rounding
+		imageData[i * 4 + 0] = static_cast<uint8_t>(r * 255.0f + 0.5f);
+		imageData[i * 4 + 1] = static_cast<uint8_t>(g * 255.0f + 0.5f);
+		imageData[i * 4 + 2] = static_cast<uint8_t>(b * 255.0f + 0.5f);
+
+		// OPTION A: Force opaque so you can see the content in viewers
+		imageData[i * 4 + 3] = 255;
+
+		// OPTION B (if you want to keep real alpha): use premultiplied alpha,
+		// imageData[i*4 + 0] = static_cast<uint8_t>(r * a * 255.0f + 0.5f);
+		// imageData[i*4 + 1] = static_cast<uint8_t>(g * a * 255.0f + 0.5f);
+		// imageData[i*4 + 2] = static_cast<uint8_t>(b * a * 255.0f + 0.5f);
+		// imageData[i*4 + 3] = static_cast<uint8_t>(a * 255.0f + 0.5f);
+	}
+
+	vmaUnmapMemory(m_allocator, stagingBuffer.m_allocation);
+
+	CreateNewDirectory("Renders");
+	std::string fileName = "Renders\\render_" + GetDateTimeString() + ".png";
+
+	stbi_write_png(
+		fileName.c_str(),
+		static_cast<int>(width),
+		static_cast<int>(height),
+		4,
+		imageData.data(),
+		static_cast<int>(width) * 4
+	);
+
+	vmaDestroyBuffer(m_allocator, stagingBuffer.m_buffer, stagingBuffer.m_allocation);
+
+	std::cout << "Wrote render to " << fileName << std::endl;
+}
+
 void HardwareRenderer::InitializeRenderer()
 {
 	m_inputManager.SetQuitFunction([this]() { this->Quit(); });
@@ -965,8 +1085,6 @@ void HardwareRenderer::InitializeRenderer()
 
 void HardwareRenderer::BuildBVH(std::vector<GPUTriangle>& triangles, std::vector<GPUBVHNode>& outNodes, ParentBVHNode& parentNode)
 {
-	//Function TBD, referring to https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/ for guidance
-
 	//No need to split further
 	if (triangles.size() <= 2)
 		return;

@@ -227,3 +227,21 @@ void UpdateImage(HardwareRenderer* renderer, AllocatedImage* img, void* data, Vk
 
 	renderer->DestroyBuffer(uploadbuffer);
 }
+
+void CopyImageToBuffer(VkCommandBuffer cmd, VkImage image, VkBuffer buffer, VkExtent3D size)
+{
+    VkBufferImageCopy copyRegion = {};
+    copyRegion.bufferOffset = 0;
+    copyRegion.bufferRowLength = 0;
+    copyRegion.bufferImageHeight = 0;
+    copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copyRegion.imageSubresource.mipLevel = 0;
+    copyRegion.imageSubresource.baseArrayLayer = 0;
+    copyRegion.imageSubresource.layerCount = 1;
+    copyRegion.imageExtent = size;
+	copyRegion.imageOffset = { 0, 0, 0 };
+
+    // copy the buffer into the image
+    vkCmdCopyImageToBuffer(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, 1,
+		&copyRegion);
+}

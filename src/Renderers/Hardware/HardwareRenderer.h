@@ -218,6 +218,9 @@ private:
 	virtual void RenderFrame();
 	void MainLoop();
 
+	void ProduceRender(int frameCount);
+	void WriteDrawImageToFile();
+
 public:
 
 	void InitializeRenderer();

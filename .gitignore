@@ -30,5 +30,5 @@
 *.pdb
 
 /build
-/Image/SoftwareRenders
+/Image/Renders/
 /Image/imgui.ini
