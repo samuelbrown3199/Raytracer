@@ -1,59 +1,12 @@
 #include <iostream>
 
-#include "Renderers/Software/SoftwareRenderer.h"
 #include "Renderers/Hardware/HardwareRenderer.h"
 #include "Useful/Useful.h"
 
-int SceneSelectionMenu()
-{
-	int scene = 0;
-	std::cout << "Select scene:\n\n";
-	std::cout << "0: Sphere scene\n";
-	std::cout << "1: Checkered Spheres\n";
-	std::cout << "2: Earth\n";
-	std::cout << "3: Quads\n";
-	std::cout << "4: Simple Light\n";
-	std::cout << "5: Cornell Box\n";
-	std::cout << "6: Gold Dragon and Spheres\n";
-	std::cout << "7: Cottage Scene\n";
-	std::cout << "\n";
-	std::cout << "----------------------------------------------\n\n";
-	std::cout << "Enter scene number: ";
-	std::cin >> scene;
-	return scene;
-}
-
 int main(int argc, char* argv[])
 {
-	if (argc != 1)
-	{
-		if (std::string(argv[1]) == "-SoftwareMode")
-		{
-			SoftwareRenderer renderer;
-
-			std::cout << "\n\n";
-			int scene = SceneSelectionMenu();
-			std::cout << "\n\n";
-
-			CreateNewDirectory("SoftwareRenders");
-
-			renderer.InitializeWorld(scene);
-			renderer.RenderImage();
-
-			std::cout << "\nPress ENTER to exit.";
-			std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-			std::cin.get();
-		}
-		else
-		{
-			std::cout << "Unknown argument: " << argv[1] << std::endl;
-		}
-	}
-	else
-	{
-		HardwareRenderer renderer;
-		renderer.InitializeRenderer();
-	}
+	HardwareRenderer renderer;
+	renderer.InitializeRenderer();
 
 	return 0;
 }

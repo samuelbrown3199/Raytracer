@@ -11,26 +11,6 @@ set (
 
 	Renderers/ModelLoader.h
 	Renderers/ModelLoader.cpp
-
-	#CPU Renderer
-
-	Renderers/Software/Common.h
-
-	Renderers/Software/Material.h
-	Renderers/Software/Hittable.h
-	Renderers/Software/Texture.h
-	Renderers/Software/Texture.cpp
-
-	Renderers/Software/Maths/AABB.h
-	Renderers/Software/Maths/AABB.cpp
-	Renderers/Software/Maths/BVH.h
-	Renderers/Software/Maths/Vector.h
-	Renderers/Software/Maths/Ray.h
-	Renderers/Software/Maths/Interval.h
-	Renderers/Software/Maths/Interval.cpp
-
-	Renderers/Software/SoftwareRenderer.h
-	Renderers/Software/SoftwareRenderer.cpp
 	
 	#GPU Renderer
 
