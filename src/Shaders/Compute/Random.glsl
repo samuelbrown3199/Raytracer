@@ -11,6 +11,12 @@ float RandomSeed(inout uint seed)
     return float(seed % 10000) / 10000.0;
 }
 
+float LCG(inout uint state)
+{
+    state = 1664525u * state + 1013904223u;
+    return float(state & 0x00FFFFFFu) / float(0x01000000u);
+}
+
 // Generates a random integer in [min, max]
 int RandomIntInRange(int min, int max, inout uint seed)
 {
@@ -25,14 +31,9 @@ float RandomFloatInRange(float min, float max, inout uint seed)
     return mix(min, max, RandomSeed(seed));
 }
 
-uint SeedFromCoords(uint x, uint y)
+uint SeedFromCoords(uint x, uint y, uint frame, uint i)
 {
-    // Use a split for the large constant into two 32-bit values
-    uint high = 1442695040u;  // Upper part of the number
-    uint low = 88963407u;     // Lower part of the number
-
-    uint seed = x * 374761393u + y * 668265263u * high + low;
-
+    uint seed = x * 374761393u + y * 668265263u + frame * 1442695040u + i * 88963407u;
     seed = (seed ^ (seed >> 16)) * 0x85ebca6b;
     seed = (seed ^ (seed >> 13)) * 0xc2b2ae35;
     seed = seed ^ (seed >> 16);

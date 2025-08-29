@@ -569,24 +569,40 @@ void HardwareRenderer::InitializeScene()
 	dullGoldMaterial.emission = 0.0f;
 	m_sceneMaterials.push_back(dullGoldMaterial);
 
-	std::string testModelPath = GetWorkingDirectory() + "\\Resources\\Models\\flat_quad.obj";
-	LoadModel(testModelPath);
+	GPUMaterial redMaterial;
+	redMaterial.albedo = glm::vec3(0.8, 0.1, 0.1);
+	redMaterial.emission = 0.0f;
+	m_sceneMaterials.push_back(redMaterial);
+
+	GPUMaterial greenMaterial;
+	greenMaterial.albedo = glm::vec3(0.1, 0.8, 0.1);
+	greenMaterial.emission = 0.0f;
+	m_sceneMaterials.push_back(greenMaterial);
+
+	std::string quadModelPath = GetWorkingDirectory() + "\\Resources\\Models\\flat_quad.obj";
+	LoadModel(quadModelPath);
 
 	std::string spherePath = GetWorkingDirectory() + "\\Resources\\Models\\icosphere.obj";
 	LoadModel(spherePath);
 
-	std::string dragonPath = GetWorkingDirectory() + "\\Resources\\Models\\dragon_lowres.obj";
+	std::string dragonPath = GetWorkingDirectory() + "\\Resources\\Models\\dragon.obj";
 	LoadModel(dragonPath);
 
-	AddSceneObject(spherePath, glm::vec3(-4, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), reflectiveMaterial);
-	AddSceneObject(spherePath, glm::vec3(0, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), glassMaterial);
-	AddSceneObject(spherePath, glm::vec3(4, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), diffuseMaterial);
-	AddSceneObject(spherePath, glm::vec3(0, 5, 0), glm::vec3(0, 0, 0), glm::vec3(0.5, 0.5, 0.5), emissiveMaterial);
+	//AddSceneObject(spherePath, glm::vec3(-4, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), reflectiveMaterial);
+	//AddSceneObject(spherePath, glm::vec3(0, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), glassMaterial);
+	//AddSceneObject(spherePath, glm::vec3(4, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), diffuseMaterial);
+	AddSceneObject(spherePath, glm::vec3(0, 10, 0), glm::vec3(0, 0, 0), glm::vec3(2, 2, 2), emissiveMaterial);
 
-	AddSceneObject(dragonPath, glm::vec3(0, 1, -10), glm::vec3(0, 180, 0), glm::vec3(0.5, 0.5, 0.5), dullGoldMaterial);
-	AddSceneObject(dragonPath, glm::vec3(4, 1, -10), glm::vec3(0, 180, 0), glm::vec3(0.5, 0.5, 0.5), glassMaterial);
+	AddSceneObject(dragonPath, glm::vec3(0, 2, 0), glm::vec3(0, 195, 0), glm::vec3(1, 1, 1), dullGoldMaterial);
+	//AddSceneObject(dragonPath, glm::vec3(4, 1, -10), glm::vec3(0, 180, 0), glm::vec3(0.5, 0.5, 0.5), glassMaterial);
 
-	AddSceneObject(testModelPath, glm::vec3(0, 0, 0), glm::vec3(0, 0, 0), glm::vec3(1000, 1, 1000), groundMaterial);
+	AddSceneObject(quadModelPath, glm::vec3(0, 0, 0), glm::vec3(0, 0, 0), glm::vec3(5, 5, 5), groundMaterial);
+	AddSceneObject(quadModelPath, glm::vec3(0, 10, 0), glm::vec3(0, 0, 180), glm::vec3(5, 5, 5), groundMaterial);
+	AddSceneObject(quadModelPath, glm::vec3(0, 5, -5), glm::vec3(90, 0, 0), glm::vec3(5, 5, 5), groundMaterial);
+	AddSceneObject(quadModelPath, glm::vec3(-5, 5, 0), glm::vec3(0, 0, 90), glm::vec3(5, 5, 5), redMaterial);
+	AddSceneObject(quadModelPath, glm::vec3(5, 5, 0), glm::vec3(0, 0, -90), glm::vec3(5, 5, 5), greenMaterial);
+	AddSceneObject(quadModelPath, glm::vec3(0, 5, 5), glm::vec3(-90, 0, 0), glm::vec3(5, 5, 5), groundMaterial);
+
 
 	BufferSceneData();
 }

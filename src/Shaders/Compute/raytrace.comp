@@ -323,78 +323,6 @@ bool HitChildNode(Ray r, int nodeIndex, Interval t)
     return IntersectAABB(r, node.aabb, t);
 }
 
-/*bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec)
-{
-    // Work with a normalized ray copy to make all t-space consistent.
-    Ray r;
-    r.origin = r_in.origin;
-    r.direction = normalize(r_in.direction);
-
-    float closestSoFar = tMax;
-    rec.t = tMax;
-    rec.hitObject = false;
-
-    for (int i = 0; i < PushConstants.parentBVHCount; i++)
-    {
-        ParentBVHNode targetBVH = parentBVH[i];
-        Interval interval; interval.min = tMin; interval.max = closestSoFar;
-
-        if (IntersectAABB(r, targetBVH.aabb, interval))
-        {
-            Object targetObject = objects[targetBVH.objectIndex];
-            int nodesToCheck[32];
-
-            int start = targetObject.triangleStartIndex;
-            int end   = start + targetObject.triangleCount;
-
-            bool needToTraverse = targetBVH.leftChild != -1 || targetBVH.rightChild != -1;
-
-            // Transform ray into local space (use inverseTransform from object)
-            vec4 localOrigin    = targetObject.inverseTransform * vec4(r.origin, 1.0);
-            vec4 localDirection = targetObject.inverseTransform * vec4(r.direction, 0.0);
-
-            Ray localRay;
-            localRay.origin    = localOrigin.xyz;
-            // normalize local direction so triangle intersection t is local parametric
-            localRay.direction = normalize(localDirection.xyz);
-
-            mat4 objectTransform = inverse(targetObject.inverseTransform); // world transform
-            mat3 normalMatrix    = mat3(transpose(targetObject.inverseTransform));
-
-            for (int triIndex = start; triIndex < end; triIndex++)
-            {
-                Interval triInterval; 
-                triInterval.min = tMin; 
-                triInterval.max = 1e30;
-
-                RayHit tempRec;
-                if (IntersectTriangle(localRay, triangles[triIndex], triInterval, tempRec))
-                {
-                    // Transform hit to world space
-                    vec3 worldPoint  = (objectTransform * vec4(tempRec.point, 1.0)).xyz;
-                    vec3 worldNormal = normalize(normalMatrix * tempRec.normal);
-
-                    // Parametric distance along the normalized world ray
-                    float worldT = dot(worldPoint - r.origin, r.direction);
-
-                    if (worldT > tMin && worldT < closestSoFar)
-                    {
-                        closestSoFar  = worldT;
-                        rec.t         = worldT; 
-                        rec.point     = worldPoint;
-                        rec.normal    = worldNormal;
-                        rec.matIndex  = targetObject.materialIndex;
-                        rec.frontFace = dot(r.direction, worldNormal) < 0.0;
-                        rec.hitObject = true;
-                    }
-                }
-            }
-        }
-    }
-
-    return rec.hitObject;
-}*/
-
 bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec, inout int triangleTests, inout int bvhNodeTests)
 {
     Ray r;
@@ -543,15 +471,6 @@ vec3 ShadowTransmission(Ray r, float tMin, float tMax, inout int triangleTests, 
             break;
 
         Material mat = materials[rec.matIndex];
-
-        // Skip light sources (don't block shadow)
-        if (mat.emission > 0.0)
-        {
-            // Move the ray origin past the light and keep searching
-            r.origin = rec.point + rec.normal * 0.001;
-            tMin = 0.001;
-            continue;
-        }
 
         // Handle transparent/refractive materials (Beer-Lambert law)
         if (mat.refractionIndex > 0.0)
@@ -721,14 +640,12 @@ void Pathtrace(ivec2 texelCoord, ivec2 size)
     vec4 newColour = vec4(0,0,0,1);
     vec4 accumulatedColour = imageLoad(accumulationImage, texelCoord);
 
-    uint baseSeed = uint(texelCoord.x + texelCoord.y * size.x) + uint(PushConstants.frame) * 7919u; // prime multiplier
-
     int triangleTests = 0;
     int bvhNodeTests = 0;
 
     for (int i = 0; i < PushConstants.raysPerPixel; i++)
     {
-        uint seed = baseSeed + uint(i) * 37u; // different for each sample
+        uint seed = SeedFromCoords(texelCoord.x, texelCoord.y, PushConstants.frame, i);
         Ray ray = GetRay(texelCoord, seed);
         RayHit rec;
         newColour.rgb += RayColour(ray, rec, seed, triangleTests, bvhNodeTests);
