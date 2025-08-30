@@ -4,7 +4,7 @@
 
 #include "Random.glsl"
 
-layout (local_size_x = 32, local_size_y = 32) in;
+layout (local_size_x = 16, local_size_y = 16) in;
 layout(rgba32f, set = 0, binding = 0) uniform image2D outputImage;
 layout(rgba32f, set = 0, binding = 1) uniform image2D accumulationImage;
 
@@ -666,7 +666,7 @@ vec3 RayColour(Ray ray, inout RayHit rec, inout uint seed, inout int triangleTes
     return result;
 }
 
-void Pathtrace(ivec2 texelCoord, ivec2 size)
+void Pathtrace(ivec2 texelCoord, ivec2 size, float raysPerPixelRatio, float accumulationMultiplier)
 {
     vec4 newColour = vec4(0,0,0,1);
     vec4 accumulatedColour = imageLoad(accumulationImage, texelCoord);
@@ -684,13 +684,13 @@ void Pathtrace(ivec2 texelCoord, ivec2 size)
 
     if(PushConstants.renderMode == 0)
     {
-        newColour.rgb /= float(PushConstants.raysPerPixel);
+        newColour.rgb *= raysPerPixelRatio;
 
         accumulatedColour.rgb += newColour.rgb;
         imageStore(accumulationImage, texelCoord, accumulatedColour);
 
         vec4 avgColour = PushConstants.accumulateFrames == 1 ? accumulatedColour : newColour;
-        avgColour.rgb /= PushConstants.accumulateFrames == 1 ? float(PushConstants.frame + 1) : 1;
+        avgColour.rgb *= accumulationMultiplier;
 
         avgColour[0] = LinearToGamma(avgColour[0]);
         avgColour[1] = LinearToGamma(avgColour[1]);
@@ -758,10 +758,13 @@ void main()
     ivec2 localCoord = ivec2(gl_LocalInvocationID.xy);
     ivec2 size = imageSize(outputImage);
 
+    float raysPerPixelRatio = 1.0 / float(PushConstants.raysPerPixel);
+    float accumulationMultiplier = PushConstants.accumulateFrames == 1 ? 1.0f / float(PushConstants.frame + 1) : 1.0;
+
     if (texelCoord.x < size.x && texelCoord.y < size.y)
     {
         if(PushConstants.renderMode == 0 || PushConstants.renderMode == 3 || PushConstants.renderMode == 4)
-            Pathtrace(texelCoord, size);
+            Pathtrace(texelCoord, size, raysPerPixelRatio, accumulationMultiplier);
         else if(PushConstants.renderMode == 1)
             RenderBoundingBoxes(texelCoord, size);
         else if(PushConstants.renderMode == 2)

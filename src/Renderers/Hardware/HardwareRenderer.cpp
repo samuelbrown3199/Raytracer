@@ -715,8 +715,8 @@ void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
 
 	vkCmdPushConstants(cmd, m_raytracePipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(RaytracePushConstants), &m_pushConstants);
 
-	uint32_t groupCountX = (m_drawExtent.width + 31) / 32;
-	uint32_t groupCountY = (m_drawExtent.height + 31) / 32;
+	uint32_t groupCountX = (m_drawExtent.width + 15) / 16;
+	uint32_t groupCountY = (m_drawExtent.height + 15) / 16;
 	vkCmdDispatch(cmd, groupCountX, groupCountY, 1);
 }
 
@@ -916,7 +916,7 @@ void HardwareRenderer::ProduceRender()
 
 	int previousPercentage = 1;
 
-	for(int i = 0; i < m_iRenderFrames; ++i)
+	for(int i = m_pushConstants.frame; i < m_iRenderFrames; ++i)
 	{
 		RenderFrame();
 		m_pushConstants.frame++;
@@ -933,6 +933,7 @@ void HardwareRenderer::ProduceRender()
 	std::cout << std::endl;
 
 	WriteDrawImageToFile();
+	m_bDoRender = false;
 
 	std::chrono::time_point<std::chrono::system_clock> endTime = std::chrono::system_clock::now();
 	std::chrono::duration<double> elapsedSeconds = endTime - startTime;
