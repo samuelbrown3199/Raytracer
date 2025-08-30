@@ -456,7 +456,7 @@ bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec, inout int triangle
             {
                 //TODO prioritise child nodes based on distance to ray origin
                 //Also skip any nodes that are further away than closest hit.
-                float distanceToLeft = 1e30;
+                /*float distanceToLeft = 1e30;
                 float distanceToRight = 1e30;
 
                 if (node.leftChild != -1)
@@ -477,7 +477,10 @@ bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec, inout int triangle
                 {
                     if (node.rightChild != -1) stack[stackPtr++] = node.rightChild;
                     if (node.leftChild != -1)  stack[stackPtr++] = node.leftChild;
-                }
+                }*/
+
+                if (node.leftChild != -1)  stack[stackPtr++] = node.leftChild;
+                if (node.rightChild != -1) stack[stackPtr++] = node.rightChild;
             }
         }
     }

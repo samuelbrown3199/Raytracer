@@ -19,7 +19,10 @@
 #include "InputManager.h"
 #include "PerformanceStats.h"
 #include "RaytracerTypes.h"
+#include "CameraController.h"
 #include "Imgui/ImGui.h"
+
+#include "../../Interface/ToolUI.h"
 
 struct DeletionQueue
 {
@@ -117,6 +120,8 @@ private:
 	bool m_bInitialized = false;
 
 	bool m_bRefreshAccumulation = true;
+	bool m_bDoRender = false;
+	int m_iRenderFrames = 0;
 
 	uint32_t m_iCurrentFrame = 0;
 	const static int MAX_FRAMES_IN_FLIGHT = 2;
@@ -151,6 +156,7 @@ private:
 	ImGuiContext* m_imguiContext;
 
 	CameraSettings m_camera;
+	CameraController m_cameraController;
 	RaytracePushConstants m_pushConstants;
 
 	VkPipeline m_raytracePipeline;
@@ -181,6 +187,8 @@ private:
 	VkDescriptorSet m_sceneDescriptor;
 	VkDescriptorSetLayout m_sceneDescriptorLayout;
 
+	std::unordered_map<std::string, std::shared_ptr<ToolUI>> m_toolUIs;
+
 	void InitializeVulkan();
 	void CreateInstance();
 	void InitializeSwapchain();
@@ -209,6 +217,7 @@ private:
 	void AddSceneObject(std::string modelPath, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, const GPUMaterial& material);
 	void ConvertSceneObjectToGPUObject(const SceneObject& obj);
 
+	void InitializeUIs();
 	void InitializeScene();
 	void BufferSceneData();
 
@@ -217,15 +226,21 @@ private:
 	void RenderImGui(VkCommandBuffer cmd, VkImage targetImage, VkImageView targetImageView);
 	virtual void RenderFrame();
 	void MainLoop();
+	void DoInterfaceControls();
 
-	void ProduceRender(int frameCount);
+	void ToggleUI(const std::string& uiName);
+
+	void ProduceRender();
 	void WriteDrawImageToFile();
 
 public:
 
 	void InitializeRenderer();
-
 	void LoadModel(const std::string& filePath);
+
+	void SetDoRender() { m_bDoRender = true; }
+	void SetRenderFrames(int frames) { m_iRenderFrames = frames; }
+	void SetRefreshAccumulation() { m_bRefreshAccumulation = true; }
 
 	InputManager* GetInputManager() { return &m_inputManager; }
 	PerformanceStats* GetPerformanceStats() { return &m_performanceStats; }

@@ -34,7 +34,7 @@ struct RaytracePushConstants
     int parentBVHCount;
 
 	glm::vec3 defocusDiskU;
-	int accumulateFrames;
+	int accumulateFrames = 1;
 
 	glm::vec3 defocusDiskV;
     int frame = 0;

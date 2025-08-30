@@ -20,8 +20,9 @@
 
 #include "../ModelLoader.h"
 
-#include "CameraController.h"
 #include "../../Useful/Useful.h"
+#include "../../Interface/RaytracerSettingsUI.hpp"
+#include "../../Interface/PerformanceStatsUI.hpp"
 
 void HardwareRenderer::InitializeVulkan()
 {
@@ -535,6 +536,22 @@ void HardwareRenderer::ConvertSceneObjectToGPUObject(const SceneObject& obj)
 	m_parentBVH.push_back(parentNode);
 }
 
+void HardwareRenderer::InitializeUIs()
+{
+	std::shared_ptr<RaytracerSettingsUI> raytraceSettings = std::make_shared<RaytracerSettingsUI>();
+	raytraceSettings->SetRenderer(this);
+	raytraceSettings->SetPushConstants(&m_pushConstants);
+	raytraceSettings->SetCameraSettings(&m_camera);
+	raytraceSettings->SetCameraController(&m_cameraController);
+
+	m_toolUIs.emplace(std::make_pair("RaytracerSettings", raytraceSettings));
+
+
+	std::shared_ptr<PerformanceStatsUI> performanceStats = std::make_shared<PerformanceStatsUI>();
+	performanceStats->SetPerformanceStats(&m_performanceStats);
+	m_toolUIs.emplace(std::make_pair("PerformanceStats", performanceStats));
+}
+
 void HardwareRenderer::InitializeScene()
 {
 	GPUMaterial groundMaterial;
@@ -839,7 +856,6 @@ void HardwareRenderer::RenderFrame()
 void HardwareRenderer::MainLoop()
 {
 	ImGuiIO& io = ImGui::GetIO();
-	CameraController cameraController;
 
 	while (m_bRun)
 	{
@@ -853,116 +869,14 @@ void HardwareRenderer::MainLoop()
 		ImGui_ImplSDL3_NewFrame();
 		ImGui::NewFrame();
 
-		cameraController.Update(this);
+		m_cameraController.Update(this);
 
-		bool doRender = false;
-		static int framesToRender = 1000;
+		DoInterfaceControls();
 
-		if(!cameraController.m_bLockedMouse)
+		for (auto& toolUI : m_toolUIs)
 		{
-			bool resetAccumulation = false;
-
-			ImGui::Begin("Raytracer Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-
-			ImGui::SeparatorText("Camera Settings");
-			ImGui::Dummy(ImVec2(0.0f, 5.0f));
-
-			std::string cameraPosStr = FormatString("Camera Position: (%.2f, %.2f, %.2f)", m_camera.cameraPosition.x, m_camera.cameraPosition.y, m_camera.cameraPosition.z);
-			ImGui::Text(cameraPosStr.c_str());
-			ImGui::Dummy(ImVec2(0, 3));
-
-			if(ImGui::DragFloat("Field of View", &m_camera.cameraFov, 0.1f, 1.0f, 179.0f))
-				resetAccumulation = true;
-
-			if (ImGui::DragFloat("Focus Distance", &m_camera.focusDistance, 0.1f, 0.1f, 1000.0f))
-				resetAccumulation = true;
-
-			if(ImGui::DragFloat("Defocus Angle", &m_camera.defocusAngle, 0.1f, 0.0f, 90.0f))
-				resetAccumulation = true;
-
-			ImGui::DragFloat("Camera Speed", &cameraController.m_fMoveSpeed, 0.1f, 1.0f, 100.0f, "%.1f");
-
-			ImGui::Dummy(ImVec2(0.0f, 5.0f));
-			ImGui::SeparatorText("Render Settings");
-			ImGui::Dummy(ImVec2(0.0f, 5.0f));
-
-			if(ImGui::Combo("Render Mode", &m_pushConstants.renderMode, "Path Trace\0Show Bounding Boxes\0Show Depth\0Triangle Tests\0BVH Node Tests\0"))
-				resetAccumulation = true;
-
-			if(ImGui::DragInt("Rays Per Pixel", &m_pushConstants.raysPerPixel, 1, 1, 100))
-				resetAccumulation = true;
-
-			if (ImGui::DragInt("Max Bounces", &m_pushConstants.maxBounces, 1, 1, 100))
-				resetAccumulation = true;
-
-			static bool accumlateFrames = true;
-			if(ImGui::Checkbox("Accumulate Frames", &accumlateFrames))
-			{
-				resetAccumulation = true;
-			}
-			m_pushConstants.accumulateFrames = accumlateFrames;
-
-			if (m_pushConstants.renderMode == 2)
-			{
-				if (ImGui::DragFloat("Depth Scale", &m_pushConstants.depthDebugScale, 0.1f, 0.1f, 100.0f))
-					resetAccumulation = true;
-			}
-
-			if (m_pushConstants.renderMode == 3)
-			{
-				if (ImGui::DragInt("Max Triangle Tests", &m_pushConstants.triangleTestThreshold, 1, 1, 10000))
-					resetAccumulation = true;
-			}
-			else if (m_pushConstants.renderMode == 4)
-			{
-				if (ImGui::DragInt("Max BVH Node Tests", &m_pushConstants.bvhNodeTestThreshold, 1, 1, 10000))
-					resetAccumulation = true;
-			}
-
-			ImGui::Dummy(ImVec2(0.0f, 5.0f));
-
-			static float sunlightColour[3] = { m_pushConstants.sunColour[0], m_pushConstants.sunColour[1], m_pushConstants.sunColour[2] };
-			if (ImGui::ColorEdit3("Sunlight Colour", sunlightColour))
-				resetAccumulation = true;
-
-			m_pushConstants.sunColour = glm::vec3(sunlightColour[0], sunlightColour[1], sunlightColour[2]);
-
-			static float sunlightDirection[3] = { m_pushConstants.sunDirection[0], m_pushConstants.sunDirection[1], m_pushConstants.sunDirection[2] };
-			if(ImGui::DragFloat3("Sunlight Direction", sunlightDirection, 0.01f, -1.0f, 1.0f))
-				resetAccumulation = true;
-
-			m_pushConstants.sunDirection = glm::normalize(glm::vec3(sunlightDirection[0], sunlightDirection[1], sunlightDirection[2]));
-
-			if (ImGui::DragFloat("Sunlight Intensity", &m_pushConstants.sunIntensity, 0.01f, 0.0f, 10.0f))
-				resetAccumulation = true;
-
-			ImGui::Dummy(ImVec2(0.0f, 5.0f));
-
-			ImGui::SeparatorText("Render Output Settings");
-			ImGui::Dummy(ImVec2(0.0f, 5.0f));
-			ImGui::Text("This will let the path tracer render and write the file out to disk.");
-			ImGui::Text("This will block the main thread until the render is complete.");
-			ImGui::Dummy(ImVec2(0.0f, 5.0f));
-			ImGui::DragInt("Frames to Render", &framesToRender, 1, 1, 100000);
-			ImGui::Dummy(ImVec2(0.0f, 5.0f));
-			if (ImGui::Button("Produce Render"))
-			{
-				doRender = true;
-			}
-
-			m_bRefreshAccumulation = m_bRefreshAccumulation || resetAccumulation;
-
-			ImGui::End();
-		}
-
-		{
-			ImGui::Begin("Performance Stats", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-			
-			ImGui::Text("Frame Time: %.2f ms", m_performanceStats.GetPerformanceMeasurement("Frame")->GetPerformanceMeasurementInMilliseconds());
-			ImGui::Text("FPS: %.1f", m_performanceStats.GetFPS());
-			ImGui::Text("AVG FPS: %.1f", m_performanceStats.GetAvgFPS());
-
-			ImGui::End();
+			if (toolUI.second->m_uiOpen)
+				toolUI.second->DoInterface();
 		}
 
 		m_pWindow->CheckScreenSizeForUpdate(this);
@@ -970,8 +884,8 @@ void HardwareRenderer::MainLoop()
 
 		m_pushConstants.frame++;
 
-		if(doRender)
-			ProduceRender(framesToRender);
+		if(m_bDoRender)
+			ProduceRender();
 
 		m_inputManager.ClearFrameInputs();
 		m_performanceStats.EndPerformanceMeasurement("Frame");
@@ -979,16 +893,30 @@ void HardwareRenderer::MainLoop()
 	}
 }
 
-void HardwareRenderer::ProduceRender(int frameCount)
+void HardwareRenderer::DoInterfaceControls()
+{
+	if (m_inputManager.GetKeyDown(SDLK_F1))
+		ToggleUI("RaytracerSettings");
+
+	if (m_inputManager.GetKeyDown(SDLK_F2))
+		ToggleUI("PerformanceStats");
+}
+
+void HardwareRenderer::ToggleUI(const std::string& uiName)
+{
+	m_toolUIs.at(uiName)->m_uiOpen = !m_toolUIs.at(uiName)->m_uiOpen;
+}
+
+void HardwareRenderer::ProduceRender()
 {
 	std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
 
 	float renderPercentage = 0.0f;
-	float percentageStep = 100.0f / frameCount;
+	float percentageStep = 100.0f / m_iRenderFrames;
 
 	int previousPercentage = 1;
 
-	for(int i = 0; i < frameCount; ++i)
+	for(int i = 0; i < m_iRenderFrames; ++i)
 	{
 		RenderFrame();
 		m_pushConstants.frame++;
@@ -1099,6 +1027,7 @@ void HardwareRenderer::InitializeRenderer()
 	m_inputManager.SetQuitFunction([this]() { this->Quit(); });
 
 	InitializeVulkan();
+	InitializeUIs();
 	InitializeScene();
 
 	MainLoop();

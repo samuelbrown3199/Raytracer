@@ -9,6 +9,10 @@ set (
 	Useful/UsefulStrings.cpp
 	Useful/Useful.h
 
+	Interface/ToolUI.h
+	Interface/RaytracerSettingsUI.hpp
+	Interface/PerformanceStatsUI.hpp
+
 	Renderers/ModelLoader.h
 	Renderers/ModelLoader.cpp
 	
