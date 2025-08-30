@@ -56,14 +56,6 @@ struct AABB
     vec3 boxMax;
 };
 
-struct ParentBVHNode
-{
-    AABB aabb;
-    int objectIndex;
-    int leftChild;
-    int rightChild;
-};
-
 struct BVHNode
 {
     AABB aabb;
@@ -71,6 +63,12 @@ struct BVHNode
     int rightChild;
     int triangleStartIndex;
     int triangleCount;
+};
+
+struct ParentBVHNode
+{
+    BVHNode node;
+    int objectIndex;
 };
 
 struct Triangle
@@ -231,6 +229,18 @@ bool IntersectTriangle(Ray ray, Triangle tri, Interval t, in out RayHit rec)
     }
 }
 
+float GetDistanceToAABB(vec3 point, AABB box)
+{
+    float sqDist = 0.0;
+    for (int i = 0; i < 3; i++)
+    {
+        float v = point[i];
+        if (v < box.boxMin[i]) sqDist += (box.boxMin[i] - v) * (box.boxMin[i] - v);
+        if (v > box.boxMax[i]) sqDist += (v - box.boxMax[i]) * (v - box.boxMax[i]);
+    }
+    return sqrt(sqDist);
+}
+
 bool NearZero(vec3 v)
 {
     const float s = 1e-8;
@@ -340,7 +350,7 @@ bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec, inout int triangle
 
         bvhNodeTests++;
 
-        if (!IntersectAABB(r, targetBVH.aabb, interval))
+        if (!IntersectAABB(r, targetBVH.node.aabb, interval))
             continue;
 
         Object targetObject = objects[targetBVH.objectIndex];
@@ -358,16 +368,16 @@ bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec, inout int triangle
         mat4 objectTransform = inverse(targetObject.inverseTransform); // world transform
         mat3 normalMatrix    = mat3(transpose(targetObject.inverseTransform));
 
-        // If no children, brute-force all triangles
-        if (targetBVH.leftChild == -1 && targetBVH.rightChild == -1)
+        if (targetBVH.node.leftChild == -1 && targetBVH.node.rightChild == -1)
         {
-            for (int triIndex = start; triIndex < end; triIndex++)
+            for (int t = 0; t < targetBVH.node.triangleCount; t++)
             {
                 triangleTests++;
 
+                int triIndex = targetBVH.node.triangleStartIndex + t;
                 Interval triInterval; 
                 triInterval.min = tMin; 
-                triInterval.max = 1e30;
+                triInterval.max = closestSoFar;
 
                 RayHit tempRec;
                 if (IntersectTriangle(localRay, triangles[triIndex], triInterval, tempRec))
@@ -388,67 +398,85 @@ bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec, inout int triangle
                     }
                 }
             }
+
+            continue;
         }
-        else
+
+        // Stack-based BVH traversal
+        int stack[32];
+        int stackPtr = 0;
+        if (targetBVH.node.leftChild != -1) stack[stackPtr++] = targetBVH.node.leftChild;
+        if (targetBVH.node.rightChild != -1) stack[stackPtr++] = targetBVH.node.rightChild;
+
+        while (stackPtr > 0)
         {
-            // Stack-based BVH traversal
-            int stack[32];
-            int stackPtr = 0;
-            if (targetBVH.leftChild != -1) stack[stackPtr++] = targetBVH.leftChild;
-            if (targetBVH.rightChild != -1) stack[stackPtr++] = targetBVH.rightChild;
+            int nodeIdx = stack[--stackPtr];
+            BVHNode node = bvhNodes[nodeIdx];
 
-            while (stackPtr > 0)
+            Interval nodeInterval; nodeInterval.min = tMin; nodeInterval.max = 1e30;
+
+            bvhNodeTests++;
+
+            if (!IntersectAABB(localRay, node.aabb, nodeInterval))
+                continue;
+
+            // Leaf node: test triangles
+            if (node.leftChild == -1 && node.rightChild == -1)
             {
-                int nodeIdx = stack[--stackPtr];
-                BVHNode node = bvhNodes[nodeIdx];
-
-                Interval nodeInterval; nodeInterval.min = tMin; nodeInterval.max = 1e30;
-
-                bvhNodeTests++;
-
-                if (!IntersectAABB(localRay, node.aabb, nodeInterval))
-                    continue;
-
-                // Leaf node: test triangles
-                if (node.leftChild == -1 && node.rightChild == -1)
+                for (int t = 0; t < node.triangleCount; t++)
                 {
-                    for (int t = 0; t < node.triangleCount; t++)
+                    triangleTests++;
+
+                    int triIndex = node.triangleStartIndex + t;
+                    Interval triInterval; 
+                    triInterval.min = tMin; 
+                    triInterval.max = closestSoFar;
+
+                    RayHit tempRec;
+                    if (IntersectTriangle(localRay, triangles[triIndex], triInterval, tempRec))
                     {
-                        triangleTests++;
+                        vec3 worldPoint  = (objectTransform * vec4(tempRec.point, 1.0)).xyz;
+                        vec3 worldNormal = normalize(normalMatrix * tempRec.normal);
+                        float worldT = dot(worldPoint - r.origin, r.direction);
 
-                        int triIndex = node.triangleStartIndex + t;
-                        Interval triInterval; 
-                        triInterval.min = tMin; 
-                        triInterval.max = 1e30;
-
-                        RayHit tempRec;
-                        if (IntersectTriangle(localRay, triangles[triIndex], triInterval, tempRec))
+                        if (worldT > tMin && worldT < closestSoFar)
                         {
-                            vec3 worldPoint  = (objectTransform * vec4(tempRec.point, 1.0)).xyz;
-                            vec3 worldNormal = normalize(normalMatrix * tempRec.normal);
-                            float worldT = dot(worldPoint - r.origin, r.direction);
-
-                            if (worldT > tMin && worldT < closestSoFar)
-                            {
-                                closestSoFar  = worldT;
-                                rec.t         = worldT; 
-                                rec.point     = worldPoint;
-                                rec.normal    = worldNormal;
-                                rec.matIndex  = targetObject.materialIndex;
-                                rec.frontFace = dot(r.direction, worldNormal) < 0.0;
-                                rec.hitObject = true;
-                            }
+                            closestSoFar  = worldT;
+                            rec.t         = worldT; 
+                            rec.point     = worldPoint;
+                            rec.normal    = worldNormal;
+                            rec.matIndex  = targetObject.materialIndex;
+                            rec.frontFace = dot(r.direction, worldNormal) < 0.0;
+                            rec.hitObject = true;
                         }
                     }
                 }
+            }
+            else
+            {
+                //TODO prioritise child nodes based on distance to ray origin
+                //Also skip any nodes that are further away than closest hit.
+                float distanceToLeft = 1e30;
+                float distanceToRight = 1e30;
+
+                if (node.leftChild != -1)
+                {
+                    distanceToLeft = GetDistanceToAABB(r.origin, bvhNodes[node.leftChild].aabb);
+                }
+                if (node.rightChild != -1)
+                {
+                    distanceToRight = GetDistanceToAABB(r.origin, bvhNodes[node.rightChild].aabb);
+                }
+
+                if(distanceToLeft < distanceToRight)
+                {
+                    if (node.leftChild != -1)  stack[stackPtr++] = node.leftChild;
+                    if (node.rightChild != -1) stack[stackPtr++] = node.rightChild;
+                }
                 else
                 {
-                    //TODO prioritise child nodes based on distance to ray origin
-                    //Also skip any nodes that are further away than closest hit.
-                    
-
-                    if (node.leftChild != -1) stack[stackPtr++] = node.leftChild;
                     if (node.rightChild != -1) stack[stackPtr++] = node.rightChild;
+                    if (node.leftChild != -1)  stack[stackPtr++] = node.leftChild;
                 }
             }
         }
@@ -692,7 +720,7 @@ void RenderBoundingBoxes(ivec2 texelCoord, ivec2 size)
     {
         ParentBVHNode targetBVH = parentBVH[i];
         Interval interval; interval.min = 0.001; interval.max = 1e20;
-        if (IntersectAABB(ray, targetBVH.aabb, interval))
+        if (IntersectAABB(ray, targetBVH.node.aabb, interval))
         {
             outColour = vec4(1,0,0,1);
             break;

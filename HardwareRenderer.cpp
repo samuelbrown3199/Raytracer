@@ -1089,58 +1089,26 @@ void HardwareRenderer::BuildBVH(std::vector<GPUTriangle>& triangles, std::vector
 	if (triangles.size() <= 2)
 		return;
 
-	//Determine longest axis
-	int axis = parentNode.node.aabb.GetLongestAxis();
-	float splitPos = (parentNode.node.aabb.min[axis] + parentNode.node.aabb.max[axis]) * 0.5f;
-	int i = 0;
-	int j = triangles.size()-1;
-	while (i <= j)
-	{
-		if (triangles[i].triCentroid[axis] < splitPos)
-		{
-			i++;
-		}
-		else
-		{
-			std::swap(triangles[i], triangles[j]);
-			j--;
-		}
-	}
-
-	int leftCount = i;
-	if (leftCount == 0 || leftCount == triangles.size())
-		return;
-
 	GPUBVHNode leftChild;
-	leftChild.triangleStartIndex = 0;
-	leftChild.triangleCount = leftCount;
+	leftChild.leftChild = -1;
 	leftChild.aabb = GPUAABB();
 
 	GPUBVHNode rightChild;
-	rightChild.triangleStartIndex = leftCount;
-	rightChild.triangleCount = triangles.size() - leftCount;
+	rightChild.leftChild = -1;
 	rightChild.aabb = GPUAABB();
-
-	ExpandNodeAABB(triangles, leftChild);
-	ExpandNodeAABB(triangles, rightChild);
 
 	outNodes.push_back(leftChild);
 	outNodes.push_back(rightChild);
 
-	int leftChildIndex = 0;
-	int rightChildIndex = 1;
-
-	SplitBVHNode(triangles, outNodes, leftChildIndex);
-	SplitBVHNode(triangles, outNodes, rightChildIndex);
+	SplitBVHNode(triangles, outNodes, leftChild);
+	SplitBVHNode(triangles, outNodes, rightChild);
 
 	parentNode.node.leftChild = m_childBVH.size();
 	parentNode.node.rightChild = m_childBVH.size() + 1;
 }
 
-void HardwareRenderer::SplitBVHNode(std::vector<GPUTriangle>& triangles, std::vector<GPUBVHNode>& outNodes, int& currentNodeIndex)
+void HardwareRenderer::SplitBVHNode(std::vector<GPUTriangle>& triangles, std::vector<GPUBVHNode>& outNodes, GPUBVHNode& node)
 {
-	GPUBVHNode& node = outNodes[currentNodeIndex];
-
 	node.leftChild = -1;
 	node.rightChild = -1;
 
@@ -1148,14 +1116,51 @@ void HardwareRenderer::SplitBVHNode(std::vector<GPUTriangle>& triangles, std::ve
 	if (node.triangleCount <= 2)
 		return;
 
-	//Determine longest axis
-	int axis = node.aabb.GetLongestAxis();
-	float splitPos = (node.aabb.min[axis] + node.aabb.max[axis]) * 0.5f;
+	int leftChildIndex = outNodes.size();
+	int rightChildIndex = outNodes.size() + 1;
+
+	node.leftChild = leftChildIndex;
+	node.rightChild = rightChildIndex;
+
+	GPUBVHNode leftChild;
+	leftChild.leftChild = -1;
+	leftChild.aabb = GPUAABB();
+
+	GPUBVHNode rightChild;
+	rightChild.leftChild = -1;
+	rightChild.aabb = GPUAABB();
+
+	outNodes.push_back(leftChild);
+	outNodes.push_back(rightChild);
+
+	int bestAxis = -1;
+	float bestPos = 0.0f, bestCost = 1e30f;
+	for(int a = 0; a < 3; a++)
+	{
+		for(int i = 0; i < node.triangleCount; i++)
+		{
+			GPUTriangle& tri = triangles[node.triangleStartIndex + i];
+			float centroidPos = tri.triCentroid[a];
+			if (centroidPos > node.aabb.min[a] && centroidPos < node.aabb.max[a])
+			{
+				float cost = EvaluateSplitCost(triangles, outNodes, node, a, centroidPos);
+				if (cost < bestCost)
+				{
+					bestCost = cost;
+					bestAxis = a;
+					bestPos = centroidPos;
+				}
+			}
+		}
+	}
+
+	float splitPos = bestPos;
 	int i = node.triangleStartIndex;
 	int j = node.triangleStartIndex + node.triangleCount - 1;
+
 	while(i <= j)
 	{
-		if (triangles[i].triCentroid[axis] < splitPos)
+		if (triangles[i].triCentroid[bestAxis] < splitPos)
 		{
 			i++;
 		}
@@ -1169,30 +1174,45 @@ void HardwareRenderer::SplitBVHNode(std::vector<GPUTriangle>& triangles, std::ve
 	if (leftCount == 0 || leftCount == node.triangleCount) 
 		return;
 
-	int leftChildIndex = outNodes.size();
-	int rightChildIndex = outNodes.size() + 1;
+	SplitBVHNode(triangles, outNodes, leftChild);
+	SplitBVHNode(triangles, outNodes, rightChild);
+}
 
-	node.leftChild = leftChildIndex;
-	node.rightChild = rightChildIndex;
+float HardwareRenderer::EvaluateSplitCost(std::vector<GPUTriangle>& triangles, std::vector<GPUBVHNode>& outNodes, GPUBVHNode& node, int axis, float pos)
+{
+	GPUBVHNode& leftChild = outNodes[node.leftChild];
+	GPUBVHNode& rightChild = outNodes[node.rightChild];
 
-	GPUBVHNode leftChild;
+	GPUAABB& leftAABB = leftChild.aabb;
+	GPUAABB& rightAABB = rightChild.aabb;
+	int leftCount = 0, rightCount = 0;
+	for (int i = 3; i < node.triangleCount; i++)
+	{
+		GPUTriangle& tri = triangles[node.triangleStartIndex + i];
+		if (tri.triCentroid[axis] < pos)
+		{
+			leftCount++;
+			leftAABB.Grow(tri.v0);
+			leftAABB.Grow(tri.v1);
+			leftAABB.Grow(tri.v2);
+		}
+		else
+		{
+			rightCount++;
+			rightAABB.Grow(tri.v0);
+			rightAABB.Grow(tri.v1);
+			rightAABB.Grow(tri.v2);
+		}
+	}
+
 	leftChild.triangleStartIndex = node.triangleStartIndex;
 	leftChild.triangleCount = leftCount;
-	leftChild.aabb = GPUAABB();
 
-	GPUBVHNode rightChild;
-	rightChild.triangleStartIndex = i;
-	rightChild.triangleCount = node.triangleCount - leftCount;
-	rightChild.aabb = GPUAABB();
+	rightChild.triangleStartIndex = node.triangleStartIndex + leftCount;
+	rightChild.triangleCount = rightCount;
 
-	ExpandNodeAABB(triangles, leftChild);
-	ExpandNodeAABB(triangles, rightChild);
-
-	outNodes.push_back(leftChild);
-	outNodes.push_back(rightChild);
-
-	SplitBVHNode(triangles, outNodes, leftChildIndex);
-	SplitBVHNode(triangles, outNodes, rightChildIndex);
+	float cost = leftCount * leftAABB.GetArea() + rightCount * rightAABB.GetArea();
+	return cost > 0 ? cost : 1e30f;
 }
 
 void HardwareRenderer::ExpandNodeAABB(std::vector<GPUTriangle>& triangles, GPUBVHNode& child)
@@ -1324,18 +1344,17 @@ void HardwareRenderer::LoadModel(const std::string& filePath)
 	modelAABB.max = glm::vec3(maxX, maxY, maxZ);
 
 	ParentBVHNode parentNode;
-	parentNode.node.aabb = modelAABB;
 	parentNode.objectIndex = -1;
 	parentNode.node.leftChild = -1;
 	parentNode.node.rightChild = -1;
-	parentNode.node.triangleStartIndex = 0;
-	parentNode.node.triangleCount = modelTriangles.size();
 
 	newModel.parentBVH = parentNode;
 
 	std::vector<GPUBVHNode> modelBVH;
 	if (!modelTriangles.empty())
 		BuildBVH(modelTriangles, modelBVH, parentNode);
+
+	parentNode.node.aabb = modelAABB;
 	
 	newModel.triangleStartIndex = m_sceneTriangles.size();
 	newModel.triangleCount = modelTriangles.size();
@@ -1352,8 +1371,6 @@ void HardwareRenderer::LoadModel(const std::string& filePath)
 
 		m_childBVH.push_back(node);
 	}
-
-	parentNode.node.triangleStartIndex += triangleGlobalOffset;
 
 	//Append reordered triangles to global list
 	for (auto& tri : modelTriangles)

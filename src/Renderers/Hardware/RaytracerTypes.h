@@ -68,15 +68,14 @@ struct GPUAABB
 		else
 			return 2; // Z axis
 	}
-};
 
-struct ParentBVHNode
-{
-	GPUAABB aabb;
-	int objectIndex;
-	int leftChild;
-	int rightChild;
-	int padding1;
+	void Grow(glm::vec3 p) { min = glm::min(min, p), max = glm::max(max, p); }
+
+	float GetArea() const
+	{
+		glm::vec3 extents = max - min;
+		return (extents.x * extents.y + extents.y * extents.z + extents.z * extents.x);
+	}
 };
 
 struct GPUBVHNode
@@ -87,6 +86,15 @@ struct GPUBVHNode
 	int rightChild;
 	int triangleStartIndex;
 	int triangleCount;
+};
+
+struct ParentBVHNode
+{
+	GPUBVHNode node;
+	int objectIndex;
+	int padding1;
+	int padding2;
+	int padding3;
 };
 
 struct GPUTriangle
