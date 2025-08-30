@@ -79,6 +79,8 @@ public:
 		}
 		pushConstants->accumulateFrames = accumlateFrames;
 
+		ImGui::Text("Current Accumulated Frames: %d", pushConstants->frame);
+
 		if (pushConstants->renderMode == 2)
 		{
 			if (ImGui::DragFloat("Depth Scale", &pushConstants->depthDebugScale, 0.1f, 0.1f, 100.0f))
