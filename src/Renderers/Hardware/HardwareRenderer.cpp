@@ -573,6 +573,13 @@ void HardwareRenderer::InitializeScene()
 	dullGoldMaterial.emission = 0.0f;
 	m_sceneMaterials.push_back(dullGoldMaterial);
 
+	GPUMaterial shinyGoldMaterial;
+	shinyGoldMaterial.albedo = glm::vec3(1.0, 0.71, 0.29);
+	shinyGoldMaterial.smoothness = 1.0f;
+	shinyGoldMaterial.fuzziness = 0.0f;
+	shinyGoldMaterial.emission = 0.0f;
+	m_sceneMaterials.push_back(shinyGoldMaterial);
+
 	GPUMaterial redMaterial;
 	redMaterial.albedo = glm::vec3(0.8, 0.1, 0.1);
 	redMaterial.emission = 0.0f;
@@ -597,7 +604,7 @@ void HardwareRenderer::InitializeScene()
 	//AddSceneObject(spherePath, glm::vec3(4, 1, 0), glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), diffuseMaterial);
 	AddSceneObject(spherePath, glm::vec3(0, 10, 0), glm::vec3(0, 0, 0), glm::vec3(2, 2, 2), emissiveMaterial);
 
-	AddSceneObject(dragonPath, glm::vec3(0, 2, 0), glm::vec3(0, 195, 0), glm::vec3(1, 1, 1), dullGoldMaterial);
+	AddSceneObject(dragonPath, glm::vec3(0, 2, 0), glm::vec3(0, 195, 0), glm::vec3(1, 1, 1), shinyGoldMaterial);
 	//AddSceneObject(dragonPath, glm::vec3(4, 1, -10), glm::vec3(0, 180, 0), glm::vec3(0.5, 0.5, 0.5), glassMaterial);
 
 	AddSceneObject(quadModelPath, glm::vec3(0, 0, 0), glm::vec3(0, 0, 0), glm::vec3(5, 5, 5), groundMaterial);
@@ -853,6 +860,9 @@ void HardwareRenderer::MainLoop()
 
 		cameraController.Update(this);
 
+		bool doRender = false;
+		static int framesToRender = 1000;
+
 		if(!cameraController.m_bLockedMouse)
 		{
 			bool resetAccumulation = false;
@@ -931,21 +941,19 @@ void HardwareRenderer::MainLoop()
 			if (ImGui::DragFloat("Sunlight Intensity", &m_pushConstants.sunIntensity, 0.01f, 0.0f, 10.0f))
 				resetAccumulation = true;
 
-			/*ImGui::Dummy(ImVec2(0.0f, 5.0f));
+			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 
 			ImGui::SeparatorText("Render Output Settings");
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 			ImGui::Text("This will let the path tracer render and write the file out to disk.");
 			ImGui::Text("This will block the main thread until the render is complete.");
 			ImGui::Dummy(ImVec2(0.0f, 5.0f));
-
-			static int framesToRender = 1000;
 			ImGui::DragInt("Frames to Render", &framesToRender, 1, 1, 100000);
-
+			ImGui::Dummy(ImVec2(0.0f, 5.0f));
 			if (ImGui::Button("Produce Render"))
 			{
-				ProduceRender(framesToRender);
-			}*/
+				doRender = true;
+			}
 
 			m_bRefreshAccumulation = m_bRefreshAccumulation || resetAccumulation;
 
@@ -967,6 +975,9 @@ void HardwareRenderer::MainLoop()
 
 		m_pushConstants.frame++;
 
+		if(doRender)
+			ProduceRender(framesToRender);
+
 		m_inputManager.ClearFrameInputs();
 		m_performanceStats.EndPerformanceMeasurement("Frame");
 		m_performanceStats.UpdatePerformanceStats();
@@ -975,19 +986,34 @@ void HardwareRenderer::MainLoop()
 
 void HardwareRenderer::ProduceRender(int frameCount)
 {
+	std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
+
 	float renderPercentage = 0.0f;
 	float percentageStep = 100.0f / frameCount;
+
+	int previousPercentage = 1;
 
 	for(int i = 0; i < frameCount; ++i)
 	{
 		RenderFrame();
 		m_pushConstants.frame++;
 
-		renderPercentage += (i+1) * percentageStep;
-		std::cout << "\rRendering: " << (int)renderPercentage << "%.2f   " << std::flush;
+		renderPercentage = (i+1) * percentageStep;
+		int rounded = glm::floor(renderPercentage);
+
+		if (rounded != previousPercentage)
+		{
+			std::cout << "\rRendering: " << (int)renderPercentage << "%   " << std::flush;
+			previousPercentage = rounded;
+		}
 	}
+	std::cout << std::endl;
 
 	WriteDrawImageToFile();
+
+	std::chrono::time_point<std::chrono::system_clock> endTime = std::chrono::system_clock::now();
+	std::chrono::duration<double> elapsedSeconds = endTime - startTime;
+	std::cout << "Render took " << elapsedSeconds.count() << " seconds." << std::endl;
 }
 
 void HardwareRenderer::WriteDrawImageToFile()
