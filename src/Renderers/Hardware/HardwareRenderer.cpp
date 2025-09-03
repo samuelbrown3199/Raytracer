@@ -23,6 +23,7 @@
 #include "../../Useful/Useful.h"
 #include "../../Interface/RaytracerSettingsUI.hpp"
 #include "../../Interface/PerformanceStatsUI.hpp"
+#include "../../Interface/SceneEditorUI.hpp"
 
 void HardwareRenderer::InitializeVulkan()
 {
@@ -550,6 +551,11 @@ void HardwareRenderer::InitializeUIs()
 	std::shared_ptr<PerformanceStatsUI> performanceStats = std::make_shared<PerformanceStatsUI>();
 	performanceStats->SetPerformanceStats(&m_performanceStats);
 	m_toolUIs.emplace(std::make_pair("PerformanceStats", performanceStats));
+
+
+	std::shared_ptr<SceneEditorUI> sceneEditor = std::make_shared<SceneEditorUI>();
+	sceneEditor->SetRenderer(this);
+	m_toolUIs.emplace(std::make_pair("SceneEditor", sceneEditor));
 }
 
 void HardwareRenderer::InitializeScene()
@@ -616,16 +622,15 @@ void HardwareRenderer::InitializeScene()
 	std::string dragonPath = GetWorkingDirectory() + "\\Resources\\Models\\dragon.obj";
 	LoadModel(dragonPath);
 
-	AddSceneObject(spherePath, glm::vec3(0, 10, 0), glm::vec3(0, 0, 0), glm::vec3(2, 2, 2), emissiveMaterial);
-
-	AddSceneObject(dragonPath, glm::vec3(0, 2, 0), glm::vec3(0, 195, 0), glm::vec3(1, 1, 1), dullGoldMaterial);
-
 	AddSceneObject(quadModelPath, glm::vec3(0, 0, 0), glm::vec3(0, 0, 0), glm::vec3(5, 5, 5), groundMaterial);
 	AddSceneObject(quadModelPath, glm::vec3(0, 10, 0), glm::vec3(0, 0, 180), glm::vec3(5, 5, 5), groundMaterial);
 	AddSceneObject(quadModelPath, glm::vec3(0, 5, -5), glm::vec3(90, 0, 0), glm::vec3(5, 5, 5), groundMaterial);
 	AddSceneObject(quadModelPath, glm::vec3(-5, 5, 0), glm::vec3(0, 0, 90), glm::vec3(5, 5, 5), redMaterial);
 	AddSceneObject(quadModelPath, glm::vec3(5, 5, 0), glm::vec3(0, 0, -90), glm::vec3(5, 5, 5), greenMaterial);
 	AddSceneObject(quadModelPath, glm::vec3(0, 5, 5), glm::vec3(-90, 0, 0), glm::vec3(5, 5, 5), groundMaterial);
+
+	AddSceneObject(spherePath, glm::vec3(0, 10, 0), glm::vec3(0, 0, 0), glm::vec3(2, 2, 2), emissiveMaterial);
+	AddSceneObject(dragonPath, glm::vec3(0, 2, 0), glm::vec3(0, 195, 0), glm::vec3(1, 1, 1), dullGoldMaterial);
 
 	BufferSceneData();
 }
@@ -671,6 +676,27 @@ void HardwareRenderer::BufferSceneData()
 	writer.WriteBuffer(3, m_sceneObjectBuffer.m_buffer, sizeof(GPUObject) * m_gpuSceneObjects.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 	writer.WriteBuffer(4, m_sceneMaterialBuffer.m_buffer, sizeof(GPUMaterial) * m_sceneMaterials.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 	writer.UpdateSet(m_device, m_sceneDescriptor);
+}
+
+void HardwareRenderer::ClearSceneData()
+{
+	DestroyBuffer(m_parentBVHBuffer);
+	DestroyBuffer(m_childBVHBuffer);
+	DestroyBuffer(m_sceneTriangleBuffer);
+	DestroyBuffer(m_sceneObjectBuffer);
+	DestroyBuffer(m_sceneMaterialBuffer);
+
+	m_parentBVH.clear();
+	m_gpuSceneObjects.clear();
+	//m_sceneTriangles.clear();
+	//m_sceneObjects.clear();
+	//m_sceneMaterials.clear();
+}
+
+void HardwareRenderer::RebufferSceneData()
+{
+	ClearSceneData();
+	BufferSceneData();
 }
 
 void HardwareRenderer::DispatchRayTracingCommands(VkCommandBuffer cmd)
@@ -900,6 +926,9 @@ void HardwareRenderer::DoInterfaceControls()
 
 	if (m_inputManager.GetKeyDown(SDLK_F2))
 		ToggleUI("PerformanceStats");
+
+	if (m_inputManager.GetKeyDown(SDLK_F3))
+		ToggleUI("SceneEditor");
 }
 
 void HardwareRenderer::ToggleUI(const std::string& uiName)

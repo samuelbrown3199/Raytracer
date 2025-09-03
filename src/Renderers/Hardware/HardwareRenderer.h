@@ -95,6 +95,7 @@ class HardwareRenderer
 {
 	friend class Window;
 	friend class CameraController;
+	friend class SceneEditorUI;
 
 private:
 
@@ -220,6 +221,8 @@ private:
 	void InitializeUIs();
 	void InitializeScene();
 	void BufferSceneData();
+	void ClearSceneData();
+	void RebufferSceneData();
 
 	void DispatchRayTracingCommands(VkCommandBuffer cmd);
 	void RefreshAccumulation(VkCommandBuffer cmd);

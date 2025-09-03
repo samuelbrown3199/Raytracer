@@ -12,6 +12,7 @@ set (
 	Interface/ToolUI.h
 	Interface/RaytracerSettingsUI.hpp
 	Interface/PerformanceStatsUI.hpp
+	Interface/SceneEditorUI.hpp
 
 	Renderers/ModelLoader.h
 	Renderers/ModelLoader.cpp
