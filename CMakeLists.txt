@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-project(Raytracer)
+project(Raytracer VERSION 0.1.0.0)
 
 include_directories (
 	src

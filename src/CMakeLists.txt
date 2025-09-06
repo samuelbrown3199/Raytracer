@@ -98,3 +98,13 @@ target_link_libraries(Raytracer SDL3-static vulkan-1 vk-bootstrap)
 set_target_properties(Raytracer PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<1:${CMAKE_SOURCE_DIR}/Image>)
 set_property(TARGET Raytracer PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/Image")
 target_compile_features(Raytracer PRIVATE cxx_std_20)
+
+if(WIN32)
+    # Configure and include version.rc for Windows
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/version.rc.in
+        ${CMAKE_CURRENT_BINARY_DIR}/version.rc
+        @ONLY
+    )
+    target_sources(Raytracer PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/version.rc)
+endif()
