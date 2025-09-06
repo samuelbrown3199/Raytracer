@@ -71,8 +71,14 @@ public:
 				if (ImGui::DragFloat("Fuzziness", &mat.fuzziness, 0.01f, 0.0f, 1.0f))
 					sceneChanged = true;
 
-				if(ImGui::DragFloat("Refraction Index", &mat.refractiveIndex, 0.01f, 1.0f, 3.0f))
+				if(ImGui::DragFloat("Refraction Index", &mat.refractiveIndex, 0.01f, 0.0f, 3.0f))
 					sceneChanged = true;
+
+				if(mat.refractiveIndex != 0.0f)
+				{
+					if (ImGui::ColorEdit3("Absorbtion", &mat.absorbtion.r))
+						sceneChanged = true;
+				}
 
 				if (ImGui::DragFloat("Emission", &mat.emission, 0.01f, 0.0f, 100.0f))
 					sceneChanged = true;
