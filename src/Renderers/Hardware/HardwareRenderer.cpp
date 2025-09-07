@@ -304,7 +304,7 @@ void HardwareRenderer::InitializeDescriptors()
 	std::vector<DescriptorAllocator::PoolSizeRatio> sizes =
 	{
 		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 5 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 5 }
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 15 }
 	};
 
 	m_globalDescriptorAllocator.InitializePool(m_device, 10, sizes);
@@ -324,6 +324,11 @@ void HardwareRenderer::InitializeDescriptors()
 		builder.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 		builder.AddBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 		builder.AddBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+		builder.AddBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+		builder.AddBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+		builder.AddBinding(7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+		builder.AddBinding(8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+		builder.AddBinding(9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 		m_sceneDescriptorLayout = builder.Build(m_device);
 	}
 
@@ -654,11 +659,6 @@ void HardwareRenderer::BufferSceneData()
 	memcpy(data, m_childBVH.data(), sizeof(GPUBVHNode) * m_childBVH.size());
 	vmaUnmapMemory(m_allocator, m_childBVHBuffer.m_allocation);
 
-	m_sceneTriangleBuffer = CreateBuffer(sizeof(GPUTriangle) * m_sceneTriangles.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneSphereBuffer");
-	vmaMapMemory(m_allocator, m_sceneTriangleBuffer.m_allocation, &data);
-	memcpy(data, m_sceneTriangles.data(), sizeof(GPUTriangle) * m_sceneTriangles.size());
-	vmaUnmapMemory(m_allocator, m_sceneTriangleBuffer.m_allocation);
-
 	m_sceneObjectBuffer = CreateBuffer(sizeof(GPUObject) * m_gpuSceneObjects.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "SceneObjectBuffer");
 	vmaMapMemory(m_allocator, m_sceneObjectBuffer.m_allocation, &data);
 	memcpy(data, m_gpuSceneObjects.data(), sizeof(GPUObject) * m_gpuSceneObjects.size());
@@ -669,12 +669,47 @@ void HardwareRenderer::BufferSceneData()
 	memcpy(data, m_sceneMaterials.data(), sizeof(GPUMaterial) * m_sceneMaterials.size());
 	vmaUnmapMemory(m_allocator, m_sceneMaterialBuffer.m_allocation);
 
+	m_triangleV0Buffer = CreateBuffer(sizeof(glm::vec4) * m_triangleV0s.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "TriangleV0sBuffer");
+	vmaMapMemory(m_allocator, m_triangleV0Buffer.m_allocation, &data);
+	memcpy(data, m_triangleV0s.data(), sizeof(glm::vec4) * m_triangleV0s.size());
+	vmaUnmapMemory(m_allocator, m_triangleV0Buffer.m_allocation);
+
+	m_triangleV1Buffer = CreateBuffer(sizeof(glm::vec4) * m_triangleV1s.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "TriangleV1sBuffer");
+	vmaMapMemory(m_allocator, m_triangleV1Buffer.m_allocation, &data);
+	memcpy(data, m_triangleV1s.data(), sizeof(glm::vec4) * m_triangleV1s.size());
+	vmaUnmapMemory(m_allocator, m_triangleV1Buffer.m_allocation);
+
+	m_triangleV2Buffer = CreateBuffer(sizeof(glm::vec4) * m_triangleV2s.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "TriangleV2sBuffer");
+	vmaMapMemory(m_allocator, m_triangleV2Buffer.m_allocation, &data);
+	memcpy(data, m_triangleV2s.data(), sizeof(glm::vec4) * m_triangleV2s.size());
+	vmaUnmapMemory(m_allocator, m_triangleV2Buffer.m_allocation);
+
+	m_triangleN0Buffer = CreateBuffer(sizeof(glm::vec4) * m_triangleN0s.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "TriangleN0sBuffer");
+	vmaMapMemory(m_allocator, m_triangleN0Buffer.m_allocation, &data);
+	memcpy(data, m_triangleN0s.data(), sizeof(glm::vec4) * m_triangleN0s.size());
+	vmaUnmapMemory(m_allocator, m_triangleN0Buffer.m_allocation);
+
+	m_triangleN1Buffer = CreateBuffer(sizeof(glm::vec4) * m_triangleN1s.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "TriangleN1sBuffer");
+	vmaMapMemory(m_allocator, m_triangleN1Buffer.m_allocation, &data);
+	memcpy(data, m_triangleN1s.data(), sizeof(glm::vec4) * m_triangleN1s.size());
+	vmaUnmapMemory(m_allocator, m_triangleN1Buffer.m_allocation);
+
+	m_triangleN2Buffer = CreateBuffer(sizeof(glm::vec4) * m_triangleN2s.size() + 1, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, "TriangleN2sBuffer");
+	vmaMapMemory(m_allocator, m_triangleN2Buffer.m_allocation, &data);
+	memcpy(data, m_triangleN2s.data(), sizeof(glm::vec4) * m_triangleN2s.size());
+	vmaUnmapMemory(m_allocator, m_triangleN2Buffer.m_allocation);
+
 	DescriptorWriter writer;
 	writer.WriteBuffer(0, m_parentBVHBuffer.m_buffer, sizeof(ParentBVHNode) * m_parentBVH.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 	writer.WriteBuffer(1, m_childBVHBuffer.m_buffer, sizeof(GPUBVHNode) * m_childBVH.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-	writer.WriteBuffer(2, m_sceneTriangleBuffer.m_buffer, sizeof(GPUTriangle) * m_sceneTriangles.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-	writer.WriteBuffer(3, m_sceneObjectBuffer.m_buffer, sizeof(GPUObject) * m_gpuSceneObjects.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-	writer.WriteBuffer(4, m_sceneMaterialBuffer.m_buffer, sizeof(GPUMaterial) * m_sceneMaterials.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(2, m_sceneObjectBuffer.m_buffer, sizeof(GPUObject) * m_gpuSceneObjects.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(3, m_sceneMaterialBuffer.m_buffer, sizeof(GPUMaterial) * m_sceneMaterials.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(4, m_triangleV0Buffer.m_buffer, sizeof(glm::vec4) * m_triangleV0s.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(5, m_triangleV1Buffer.m_buffer, sizeof(glm::vec4) * m_triangleV1s.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(6, m_triangleV2Buffer.m_buffer, sizeof(glm::vec4) * m_triangleV2s.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(7, m_triangleN0Buffer.m_buffer, sizeof(glm::vec4) * m_triangleN0s.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(8, m_triangleN1Buffer.m_buffer, sizeof(glm::vec4) * m_triangleN1s.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+	writer.WriteBuffer(9, m_triangleN2Buffer.m_buffer, sizeof(glm::vec4) * m_triangleN2s.size(), 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 	writer.UpdateSet(m_device, m_sceneDescriptor);
 }
 
@@ -682,7 +717,6 @@ void HardwareRenderer::ClearSceneData()
 {
 	DestroyBuffer(m_parentBVHBuffer);
 	DestroyBuffer(m_childBVHBuffer);
-	DestroyBuffer(m_sceneTriangleBuffer);
 	DestroyBuffer(m_sceneObjectBuffer);
 	DestroyBuffer(m_sceneMaterialBuffer);
 
@@ -1083,7 +1117,7 @@ void HardwareRenderer::LoadModel(const std::string& filePath)
 
 	Model newModel;
 	GPUAABB modelAABB;
-	newModel.triangleStartIndex = static_cast<int>(m_sceneTriangles.size());
+	newModel.triangleStartIndex = static_cast<int>(m_triangleV0s.size());
 
 	std::vector<Vertex> vertices;
 	std::vector<GPUTriangle> modelTriangles;
@@ -1175,12 +1209,12 @@ void HardwareRenderer::LoadModel(const std::string& filePath)
 	if (!modelTriangles.empty())
 		BuildBVH(modelTriangles, modelBVH, parentNode, m_childBVH.size());
 	
-	newModel.triangleStartIndex = m_sceneTriangles.size();
+	newModel.triangleStartIndex = m_triangleV0s.size();
 	newModel.triangleCount = modelTriangles.size();
 
 	// Now convert modelBVH node local starts into global indices and update child indices
 	int bvhGlobalOffset = static_cast<int>(m_childBVH.size());
-	int triangleGlobalOffset = static_cast<int>(m_sceneTriangles.size());
+	int triangleGlobalOffset = static_cast<int>(m_triangleV0s.size());
 	for (auto& node : modelBVH)
 	{
 		node.leftChild = node.leftChild != -1 ? node.leftChild + bvhGlobalOffset : -1;
@@ -1195,7 +1229,15 @@ void HardwareRenderer::LoadModel(const std::string& filePath)
 
 	//Append reordered triangles to global list
 	for (auto& tri : modelTriangles)
-		m_sceneTriangles.push_back(tri);
+	{
+		m_triangleV0s.push_back(glm::vec4(tri.v0, 0.0));
+		m_triangleV1s.push_back(glm::vec4(tri.v1, 0.0));
+		m_triangleV2s.push_back(glm::vec4(tri.v2, 0.0));
+
+		m_triangleN0s.push_back(glm::vec4(tri.n0, 0.0));
+		m_triangleN1s.push_back(glm::vec4(tri.n1, 0.0));
+		m_triangleN2s.push_back(glm::vec4(tri.n2, 0.0));
+	}
 
 	// store parent BVH and model
 	newModel.parentBVH = parentNode;

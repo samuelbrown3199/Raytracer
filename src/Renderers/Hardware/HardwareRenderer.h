@@ -173,8 +173,24 @@ private:
 
 	std::vector<GPUObject> m_gpuSceneObjects;
 	AllocatedBuffer m_sceneObjectBuffer;
-	std::vector<GPUTriangle> m_sceneTriangles;
-	AllocatedBuffer m_sceneTriangleBuffer;
+
+	std::vector<glm::vec4> m_triangleV0s;
+	AllocatedBuffer m_triangleV0Buffer;
+
+	std::vector<glm::vec4> m_triangleV1s;
+	AllocatedBuffer m_triangleV1Buffer;
+
+	std::vector<glm::vec4> m_triangleV2s;
+	AllocatedBuffer m_triangleV2Buffer;
+
+	std::vector<glm::vec4> m_triangleN0s;
+	AllocatedBuffer m_triangleN0Buffer;
+
+	std::vector<glm::vec4> m_triangleN1s;
+	AllocatedBuffer m_triangleN1Buffer;
+
+	std::vector<glm::vec4> m_triangleN2s;
+	AllocatedBuffer m_triangleN2Buffer;
 
 	std::vector<ParentBVHNode> m_parentBVH;
 	AllocatedBuffer m_parentBVHBuffer;

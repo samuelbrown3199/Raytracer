@@ -104,20 +104,46 @@ layout(std140, set=1, binding=1) readonly buffer BVHNodeBuffer
     BVHNode bvhNodes[];
 };
 
-layout(std140, set=1, binding=2) readonly buffer TriangleBuffer
-{
-	Triangle triangles[];
-};
-
-layout(std140, set=1, binding=3) readonly buffer ObjectBuffer
+layout(std140, set=1, binding=2) readonly buffer ObjectBuffer
 {
     Object objects[];
 };
 
-layout(set=1, binding=4) readonly buffer MaterialBuffer
+layout(set=1, binding=3) readonly buffer MaterialBuffer
 {
     Material materials[];
 };
+
+layout(std140, set=1, binding=4) readonly buffer TriangleV0s
+{
+    vec4 triangleV0s[];
+};
+
+layout(std140, set=1, binding=5) readonly buffer TriangleV1s
+{
+    vec4 triangleV1s[];
+};
+
+layout(std140, set=1, binding=6) readonly buffer TriangleV2s
+{
+    vec4 triangleV2s[];
+};
+
+layout(std140, set=1, binding=7) readonly buffer TriangleN0s
+{
+    vec4 triangleN0s[];
+};
+
+layout(std140, set=1, binding=8) readonly buffer TriangleN1s
+{
+    vec4 triangleN1s[];
+};
+
+layout(std140, set=1, binding=9) readonly buffer TriangleN2s
+{
+    vec4 triangleN2s[];
+};
+
 
 layout(push_constant) uniform constants
 {	
@@ -184,17 +210,25 @@ bool IntersectAABB(Ray ray, AABB box, inout Interval t)
     return true;
 }
 
-bool IntersectTriangle(Ray ray, Triangle tri, Interval t, in out RayHit rec)
+bool IntersectTriangle(Ray ray, int triIndex, Interval t, in out RayHit rec)
 {
-    vec3 edge1 = tri.v1 - tri.v0;
-    vec3 edge2 = tri.v2 - tri.v0;
+    vec3 triV0 = triangleV0s[triIndex].xyz;
+    vec3 triV1 = triangleV1s[triIndex].xyz;
+    vec3 triV2 = triangleV2s[triIndex].xyz;
+
+    vec3 n0 = triangleN0s[triIndex].xyz;
+    vec3 n1 = triangleN1s[triIndex].xyz;
+    vec3 n2 = triangleN2s[triIndex].xyz;
+
+    vec3 edge1 = triV1 - triV0;
+    vec3 edge2 = triV2 - triV0;
     vec3 h = cross(ray.direction, edge2);
     float a = dot(edge1, h);
     if (abs(a) < 1e-8)
         return false; // Ray is parallel to triangle
 
     float invDet = 1.0 / a;
-    vec3 s = ray.origin - tri.v0;
+    vec3 s = ray.origin - triV0;
     float u = invDet * dot(s, h);
     if (u < 0.0 || u > 1.0)
         return false;
@@ -215,7 +249,7 @@ bool IntersectTriangle(Ray ray, Triangle tri, Interval t, in out RayHit rec)
 
          // --- Smooth normal interpolation ---
         float w = 1.0 - u - v;
-        vec3 interpolatedNormal = normalize(tri.n0 * w + tri.n1 * u + tri.n2 * v);
+        vec3 interpolatedNormal = normalize(n0 * w + n1 * u + n2 * v);
 
         rec.frontFace = dot(ray.direction, interpolatedNormal) < 0.0;
         rec.normal = rec.frontFace ? interpolatedNormal : -interpolatedNormal;
@@ -380,7 +414,7 @@ bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec, inout int triangle
                 triInterval.max = closestSoFar;
 
                 RayHit tempRec;
-                if (IntersectTriangle(localRay, triangles[triIndex], triInterval, tempRec))
+                if (IntersectTriangle(localRay, triIndex, triInterval, tempRec))
                 {
                     vec3 worldPoint  = (objectTransform * vec4(tempRec.point, 1.0)).xyz;
                     vec3 worldNormal = normalize(normalMatrix * tempRec.normal);
@@ -433,7 +467,7 @@ bool GetHit(Ray r_in, float tMin, float tMax, out RayHit rec, inout int triangle
                     triInterval.max = closestSoFar;
 
                     RayHit tempRec;
-                    if (IntersectTriangle(localRay, triangles[triIndex], triInterval, tempRec))
+                    if (IntersectTriangle(localRay, triIndex, triInterval, tempRec))
                     {
                         vec3 worldPoint  = (objectTransform * vec4(tempRec.point, 1.0)).xyz;
                         vec3 worldNormal = normalize(normalMatrix * tempRec.normal);
