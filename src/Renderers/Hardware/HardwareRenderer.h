@@ -173,14 +173,54 @@ private:
 
 	std::vector<GPUObject> m_gpuSceneObjects;
 	AllocatedBuffer m_sceneObjectBuffer;
-	std::vector<GPUTriangle> m_sceneTriangles;
-	AllocatedBuffer m_sceneTriangleBuffer;
+
+	std::vector<glm::vec4> m_triangleV0s;
+	AllocatedBuffer m_triangleV0Buffer;
+
+	std::vector<glm::vec4> m_triangleV1s;
+	AllocatedBuffer m_triangleV1Buffer;
+
+	std::vector<glm::vec4> m_triangleV2s;
+	AllocatedBuffer m_triangleV2Buffer;
+
+	std::vector<glm::vec4> m_triangleN0s;
+	AllocatedBuffer m_triangleN0Buffer;
+
+	std::vector<glm::vec4> m_triangleN1s;
+	AllocatedBuffer m_triangleN1Buffer;
+
+	std::vector<glm::vec4> m_triangleN2s;
+	AllocatedBuffer m_triangleN2Buffer;
+
+	std::vector<glm::vec4> m_triangleUV0s;
+	AllocatedBuffer m_triangleUV0Buffer;
+
+	std::vector<glm::vec4> m_triangleUV1s;
+	AllocatedBuffer m_triangleUV1Buffer;
+
+	std::vector<glm::vec4> m_triangleUV2s;
+	AllocatedBuffer m_triangleUV2Buffer;
 
 	std::vector<ParentBVHNode> m_parentBVH;
 	AllocatedBuffer m_parentBVHBuffer;
 
-	std::vector<GPUBVHNode> m_childBVH;
-	AllocatedBuffer m_childBVHBuffer;
+	std::vector<glm::vec4> m_aabbMins;
+	AllocatedBuffer m_aabbMinBuffer;
+
+	std::vector<glm::vec4> m_aabbMaxs;
+	AllocatedBuffer m_aabbMaxBuffer;
+
+	std::vector<int> m_bvhLeftChildren;
+	AllocatedBuffer m_bvhLeftChildrenBuffer;
+
+	std::vector<int> m_bvhRightChildren;
+	AllocatedBuffer m_bvhRightChildrenBuffer;
+
+	std::vector<int> m_bvhTriangleStartIndices;
+	AllocatedBuffer m_bvhTriangleStartIndicesBuffer;
+
+	std::vector<int> m_bvhTriangleCounts;
+	AllocatedBuffer m_bvhTriangleCountsBuffer;
 
 	std::vector<GPUMaterial> m_sceneMaterials;
 	AllocatedBuffer m_sceneMaterialBuffer;

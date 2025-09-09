@@ -7,7 +7,7 @@
 
 #include "../Useful/Useful.h"
 
-void BuildBVH(std::vector<GPUTriangle>& triangles, std::vector<GPUBVHNode>& outNodes, ParentBVHNode& parentNode, int currentBVHSize)
+void BuildBVH(std::vector<Triangle>& triangles, std::vector<BVHNode>& outNodes, ParentBVHNode& parentNode, int currentBVHSize)
 {
 	//No need to split further
 	if (triangles.size() <= 2)
@@ -35,15 +35,15 @@ void BuildBVH(std::vector<GPUTriangle>& triangles, std::vector<GPUBVHNode>& outN
 	if (leftCount == 0 || leftCount == triangles.size())
 		return;
 
-	GPUBVHNode leftChild;
+	BVHNode leftChild;
 	leftChild.triangleStartIndex = 0;
 	leftChild.triangleCount = leftCount;
-	leftChild.aabb = GPUAABB();
+	leftChild.aabb = AABB();
 
-	GPUBVHNode rightChild;
+	BVHNode rightChild;
 	rightChild.triangleStartIndex = leftCount;
 	rightChild.triangleCount = triangles.size() - leftCount;
-	rightChild.aabb = GPUAABB();
+	rightChild.aabb = AABB();
 
 	ExpandNodeAABB(triangles, leftChild);
 	ExpandNodeAABB(triangles, rightChild);
@@ -61,9 +61,9 @@ void BuildBVH(std::vector<GPUTriangle>& triangles, std::vector<GPUBVHNode>& outN
 	parentNode.node.rightChild = currentBVHSize + 1;
 }
 
-void SplitBVHNode(std::vector<GPUTriangle>& triangles, std::vector<GPUBVHNode>& outNodes, int& currentNodeIndex)
+void SplitBVHNode(std::vector<Triangle>& triangles, std::vector<BVHNode>& outNodes, int& currentNodeIndex)
 {
-	GPUBVHNode& node = outNodes[currentNodeIndex];
+	BVHNode& node = outNodes[currentNodeIndex];
 
 	node.leftChild = -1;
 	node.rightChild = -1;
@@ -99,15 +99,15 @@ void SplitBVHNode(std::vector<GPUTriangle>& triangles, std::vector<GPUBVHNode>& 
 	node.leftChild = leftChildIndex;
 	node.rightChild = rightChildIndex;
 
-	GPUBVHNode leftChild;
+	BVHNode leftChild;
 	leftChild.triangleStartIndex = node.triangleStartIndex;
 	leftChild.triangleCount = leftCount;
-	leftChild.aabb = GPUAABB();
+	leftChild.aabb = AABB();
 
-	GPUBVHNode rightChild;
+	BVHNode rightChild;
 	rightChild.triangleStartIndex = i;
 	rightChild.triangleCount = node.triangleCount - leftCount;
-	rightChild.aabb = GPUAABB();
+	rightChild.aabb = AABB();
 
 	ExpandNodeAABB(triangles, leftChild);
 	ExpandNodeAABB(triangles, rightChild);
@@ -119,7 +119,7 @@ void SplitBVHNode(std::vector<GPUTriangle>& triangles, std::vector<GPUBVHNode>& 
 	SplitBVHNode(triangles, outNodes, rightChildIndex);
 }
 
-void ExpandNodeAABB(std::vector<GPUTriangle>& triangles, GPUBVHNode& child)
+void ExpandNodeAABB(std::vector<Triangle>& triangles, BVHNode& child)
 {
 	child.aabb.min = glm::vec3(FLT_MAX);
 	child.aabb.max = glm::vec3(-FLT_MAX);
@@ -127,7 +127,7 @@ void ExpandNodeAABB(std::vector<GPUTriangle>& triangles, GPUBVHNode& child)
 	int first = child.triangleStartIndex;
 	for (int i = 0; i < child.triangleCount; i++)
 	{
-		GPUTriangle& tri = triangles[first + i];
+		Triangle& tri = triangles[first + i];
 		if (tri.v0.x < child.aabb.min.x) child.aabb.min.x = tri.v0.x;
 		if (tri.v0.y < child.aabb.min.y) child.aabb.min.y = tri.v0.y;
 		if (tri.v0.z < child.aabb.min.z) child.aabb.min.z = tri.v0.z;

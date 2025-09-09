@@ -51,7 +51,7 @@ struct RaytracePushConstants
 	int padding2;
 };
 
-struct GPUAABB
+struct AABB
 {
 	glm::vec3 min;
 	float padding2;
@@ -78,9 +78,9 @@ struct GPUAABB
 	}
 };
 
-struct GPUBVHNode
+struct BVHNode
 {
-	GPUAABB aabb;
+	AABB aabb;
 
 	int leftChild;
 	int rightChild;
@@ -90,42 +90,28 @@ struct GPUBVHNode
 
 struct ParentBVHNode
 {
-	GPUBVHNode node;
+	BVHNode node;
 	int objectIndex;
 	int padding1;
 	int padding2;
 	int padding3;
 };
 
-struct GPUTriangle
+struct Triangle
 {
 	glm::vec3 v0;
-	float padding;
-
 	glm::vec3 v1;
-	float padding1;
-
 	glm::vec3 v2;
-	float padding2;
 
 	glm::vec2 uv0;
 	glm::vec2 uv1;
-
 	glm::vec2 uv2;
-	float padding4;
-	float padding5;
 
 	glm::vec3 n0;
-	float padding6;
-
 	glm::vec3 n1;
-	float padding7;
-
 	glm::vec3 n2;
-	float padding8;
 
 	glm::vec3 triCentroid;
-	float padding9;
 };
 
 struct GPUObject
