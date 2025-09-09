@@ -69,7 +69,7 @@ public:
 		if (ImGui::DragInt("Rays Per Pixel", &pushConstants->raysPerPixel, 1, 1, 100))
 			resetAccumulation = true;
 
-		if (ImGui::DragInt("Max Bounces", &pushConstants->maxBounces, 1, 1, 100))
+		if (ImGui::DragInt("Max Bounces", &pushConstants->maxBounces, 1, 0, 100))
 			resetAccumulation = true;
 
 		static bool accumlateFrames = true;
