@@ -119,6 +119,146 @@ void SplitBVHNode(std::vector<Triangle>& triangles, std::vector<BVHNode>& outNod
 	SplitBVHNode(triangles, outNodes, rightChildIndex);
 }
 
+//WIP - SAH version
+
+void BuildBVHSAH(std::vector<Triangle>& triangles, std::vector<BVHNode>& outNodes, ParentBVHNode& parentNode, int currentBVHSize)
+{
+	//No need to split further
+	if (triangles.size() <= 2)
+		return;
+
+	BVHNode leftChild;
+	leftChild.leftChild = -1;
+	leftChild.aabb = AABB();
+
+	BVHNode rightChild;
+	rightChild.leftChild = -1;
+	rightChild.aabb = AABB();
+
+	outNodes.push_back(leftChild);
+	outNodes.push_back(rightChild);
+
+	SplitBVHNodeSAH(triangles, outNodes, leftChild);
+	SplitBVHNodeSAH(triangles, outNodes, rightChild);
+
+	parentNode.node.leftChild = currentBVHSize;
+	parentNode.node.rightChild = currentBVHSize + 1;
+}
+
+void SplitBVHNodeSAH(std::vector<Triangle>& triangles, std::vector<BVHNode>& outNodes, BVHNode& node)
+{
+	node.leftChild = -1;
+	node.rightChild = -1;
+
+	//No need to split further
+	if (node.triangleCount <= 2)
+		return;
+
+	int leftChildIndex = outNodes.size();
+	int rightChildIndex = outNodes.size() + 1;
+
+	node.leftChild = leftChildIndex;
+	node.rightChild = rightChildIndex;
+
+	BVHNode leftChild;
+	leftChild.leftChild = -1;
+	leftChild.aabb = AABB();
+
+	BVHNode rightChild;
+	rightChild.leftChild = -1;
+	rightChild.aabb = AABB();
+
+	outNodes.push_back(leftChild);
+	outNodes.push_back(rightChild);
+
+	int bestAxis = -1;
+	float bestPos = 0.0f, bestCost = 1e30f;
+	for (int a = 0; a < 3; a++)
+	{
+		for (int i = 0; i < node.triangleCount; i++)
+		{
+			Triangle& tri = triangles[node.triangleStartIndex + i];
+			float centroidPos = tri.triCentroid[a];
+			if (centroidPos > node.aabb.min[a] && centroidPos < node.aabb.max[a])
+			{
+				float cost = EvaluateSplitCost(triangles, outNodes, node, a, centroidPos);
+				if (cost < bestCost)
+				{
+					bestCost = cost;
+					bestAxis = a;
+					bestPos = centroidPos;
+				}
+			}
+		}
+	}
+
+	float splitPos = bestPos;
+	int i = node.triangleStartIndex;
+	int j = node.triangleStartIndex + node.triangleCount - 1;
+
+	glm::vec3 e = node.aabb.max - node.aabb.min;
+	float parentArea = e.x * e.y + e.y * e.z + e.z * e.x;
+	float parentCost = node.triangleCount * parentArea;
+
+	while (i <= j)
+	{
+		if (triangles[i].triCentroid[bestAxis] < splitPos)
+		{
+			i++;
+		}
+		else
+		{
+			std::swap(triangles[i], triangles[j]);
+			j--;
+		}
+	}
+	int leftCount = i - node.triangleStartIndex;
+	if (leftCount == 0 || leftCount == node.triangleCount)
+		return;
+
+	if (bestCost >= parentCost) return;
+
+	SplitBVHNodeSAH(triangles, outNodes, leftChild);
+	SplitBVHNodeSAH(triangles, outNodes, rightChild);
+}
+
+float EvaluateSplitCost(std::vector<Triangle>& triangles, std::vector<BVHNode>& outNodes, BVHNode& node, int axis, float pos)
+{
+	BVHNode& leftChild = outNodes[node.leftChild];
+	BVHNode& rightChild = outNodes[node.rightChild];
+
+	AABB& leftAABB = leftChild.aabb;
+	AABB& rightAABB = rightChild.aabb;
+	int leftCount = 0, rightCount = 0;
+	for (int i = 3; i < node.triangleCount; i++)
+	{
+		Triangle& tri = triangles[node.triangleStartIndex + i];
+		if (tri.triCentroid[axis] < pos)
+		{
+			leftCount++;
+			leftAABB.Grow(tri.v0);
+			leftAABB.Grow(tri.v1);
+			leftAABB.Grow(tri.v2);
+		}
+		else
+		{
+			rightCount++;
+			rightAABB.Grow(tri.v0);
+			rightAABB.Grow(tri.v1);
+			rightAABB.Grow(tri.v2);
+		}
+	}
+
+	leftChild.triangleStartIndex = node.triangleStartIndex;
+	leftChild.triangleCount = leftCount;
+
+	rightChild.triangleStartIndex = node.triangleStartIndex + leftCount;
+	rightChild.triangleCount = rightCount;
+
+	float cost = leftCount * leftAABB.GetArea() + rightCount * rightAABB.GetArea();
+	return cost > 0 ? cost : 1e30f;
+}
+
 void ExpandNodeAABB(std::vector<Triangle>& triangles, BVHNode& child)
 {
 	child.aabb.min = glm::vec3(FLT_MAX);

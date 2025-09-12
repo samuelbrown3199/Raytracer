@@ -215,16 +215,20 @@ bool IntersectAABB(Ray ray, int boxIndex, inout Interval t)
         float minA = boxMin[a];
         float maxA = boxMax[a];
 
-        if (abs(dirA) < 1e-8) {
+        if (abs(dirA) < 1e-8) 
+        {
             // Ray is parallel to slab. If origin not within slab -> miss.
             if (originA < minA || originA > maxA)
                 return false;
             // else parallel and inside slab -> no change to t
-        } else {
+        } 
+        else
+        {
             float invD = 1.0 / dirA;
             float t0 = (minA - originA) * invD;
             float t1 = (maxA - originA) * invD;
-            if (invD < 0.0) {
+            if (invD < 0.0)
+            {
                 // swap
                 float tmp = t0;
                 t0 = t1;
@@ -285,25 +289,24 @@ bool IntersectTriangle(Ray ray, int triIndex, Interval t, in out RayHit rec)
     vec3 edge2 = triV2 - triV0;
     vec3 h = cross(ray.direction, edge2);
     float a = dot(edge1, h);
-    if (abs(a) < 1e-8)
+    float eps = 1e-5;
+    if (abs(a) < eps)
         return false; // Ray is parallel to triangle
 
     float invDet = 1.0 / a;
     vec3 s = ray.origin - triV0;
     float u = invDet * dot(s, h);
-    if (u < 0.0 || u > 1.0)
-        return false;
 
     vec3 sCross = cross(s, edge1);
     float v = invDet * dot(ray.direction, sCross);
-    if (v < 0.0 || u + v > 1.0)
-        return false;
+    if (u < -eps || u > 1.0 + eps) return false;
+    if (v < -eps || u + v > 1.0 + eps) return false;
 
     float hitT = invDet * dot(edge2, sCross);
     if (!IntervalSurrounds(t, hitT))
         return false;
 
-    if(hitT > 1e-8)
+    if(hitT > eps)
     {
         rec.t = hitT;
         rec.point = PointAtT(rec.t, ray);
@@ -724,7 +727,7 @@ vec3 RayColour(Ray ray, inout RayHit rec, inout uint seed, inout int triangleTes
         if(nDotL > 0.0)
         {
             Ray shadowRay;
-            shadowRay.origin = rec.point + rec.normal * 0.001;
+            shadowRay.origin = rec.point + rec.normal * 0.01;
             shadowRay.direction = -PushConstants.sunDir;
 
             vec3 shadowTrans = ShadowTransmission(shadowRay, 0.001, 1e20, triangleTests, bvhNodeTests);
