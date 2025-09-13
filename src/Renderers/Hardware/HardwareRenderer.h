@@ -124,6 +124,8 @@ private:
 	bool m_bDoRender = false;
 	int m_iRenderFrames = 0;
 
+	bool m_bDLSSSupported = false;
+
 	uint32_t m_iCurrentFrame = 0;
 	const static int MAX_FRAMES_IN_FLIGHT = 2;
 	FrameData m_frames[MAX_FRAMES_IN_FLIGHT];
@@ -238,6 +240,10 @@ private:
 	void InitializeDescriptors();
 	void InitializeImgui();
 	void InitializePipelines();
+
+	void QueryDLSSSupport();
+
+	void Cleanup();
 
 	SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
 	VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);

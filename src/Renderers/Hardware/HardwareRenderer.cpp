@@ -10,6 +10,11 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+#include "streamline/sl.h"
+#include "streamline/sl_consts.h"
+#include "streamline/sl_dlss.h"
+#include "streamline/sl_helpers_vk.h"
+
 #include "../../Useful/Useful.h"
 #include "Vulkan/VulkanImages.h"
 #include "Vulkan/VulkanInitialisers.h"
@@ -49,6 +54,35 @@ VKAPI_ATTR VkBool32 VKAPI_CALL HardwareRenderer::DebugCallback(VkDebugUtilsMessa
 
 void HardwareRenderer::CreateInstance()
 {
+	sl::Preferences pref{};
+	pref.showConsole = true; //todo: set this to false in release builds.
+	pref.logLevel = sl::LogLevel::eDefault;
+	pref.pathsToPlugins = {}; // change this if Streamline plugins are not located next to the executable
+	pref.numPathsToPlugins = 0; // change this if Streamline plugins are not located next to the executable
+
+	std::vector<sl::Feature> streamlineFeatures = { sl::kFeatureDLSS };
+	pref.featuresToLoad = streamlineFeatures.data();
+	pref.numFeaturesToLoad = streamlineFeatures.size();
+
+	//pref.logMessageCallback = &HardwareRenderer::DebugCallback; TBD
+	//pref.applicationId = tbd;
+	pref.engine = sl::EngineType::eCustom;
+	pref.engineVersion = "0.0.0.1"; //todo: add proper versioning to this.
+
+	sl::Result res;
+	if(SL_FAILED(res, slInit(pref)))
+	{
+		if(res == sl::Result::eErrorDriverOutOfDate)
+			throw std::exception("Failed to initialize Streamline. Driver out of date.");
+		else if(res == sl::Result::eErrorOSOutOfDate)
+			throw std::exception("Failed to initialize Streamline. OS out of date.");
+		else if(res == sl::Result::eErrorNoSupportedAdapterFound)
+			throw std::exception("Failed to initialize Streamline. No supported adapter found.");
+		else
+			throw std::exception("Failed to initialize Streamline.");
+	}
+
+
 	vkb::InstanceBuilder builder;
 
 	auto instanceRet = builder.set_app_name("Raytracer")
@@ -126,6 +160,20 @@ void HardwareRenderer::CreateInstance()
 	allocatorInfo.instance = m_vulkanInstance;
 	allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 	vmaCreateAllocator(&allocatorInfo, &m_allocator);
+
+	sl::VulkanInfo vkInfo{};
+	vkInfo.instance = m_vulkanInstance;
+	vkInfo.physicalDevice = m_physicalDevice;
+	vkInfo.device = m_device;
+	vkInfo.graphicsQueueFamily = m_graphicsQueueFamily;
+	vkInfo.graphicsQueueIndex = 0;
+
+	if (SL_FAILED(res, slSetVulkanInfo(vkInfo)))
+	{
+		throw std::exception("Failed to set Vulkan info for Streamline.");
+	}
+
+	QueryDLSSSupport();
 }
 
 void HardwareRenderer::InitializeSwapchain()
@@ -468,6 +516,36 @@ void HardwareRenderer::InitializePipelines()
 		m_raytracePipeline = pipelineBuilder.BuildComputePipeline(GetLogicalDevice());
 
 		vkDestroyShaderModule(m_device, computeShader, nullptr);
+	}
+}
+
+void HardwareRenderer::QueryDLSSSupport()
+{
+	sl::AdapterInfo adapterInfo{};
+	adapterInfo.vkPhysicalDevice = m_physicalDevice;   // VkPhysicalDevice
+
+	// Quick check
+	sl::Result res = slIsFeatureSupported(sl::kFeatureDLSS, adapterInfo);
+	if (res == sl::Result::eOk)
+	{
+		std::cout << "DLSS is supported on this GPU!\n";
+		m_bDLSSSupported = true;
+	}
+	else
+	{
+		std::cout << "DLSS not supported on this GPU.\n";
+		m_bDLSSSupported = false;
+	}
+}
+
+void HardwareRenderer::Cleanup()
+{
+	vkDeviceWaitIdle(m_device);
+
+	sl::Result res;
+	if (SL_FAILED(res, slShutdown()))
+	{
+		std::cout << "Failed to shutdown Streamline.\n";
 	}
 }
 
@@ -1008,6 +1086,8 @@ void HardwareRenderer::MainLoop()
 		m_performanceStats.EndPerformanceMeasurement("Frame");
 		m_performanceStats.UpdatePerformanceStats();
 	}
+
+	Cleanup();
 }
 
 void HardwareRenderer::DoInterfaceControls()

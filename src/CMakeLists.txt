@@ -94,7 +94,7 @@ foreach(source IN LISTS program_source shader_source)
     source_group("${source_path_msvc}" FILES "${source}")
 endforeach()
 
-target_link_libraries(Raytracer SDL3-static vulkan-1 vk-bootstrap)
+target_link_libraries(Raytracer SDL3-static vulkan-1 vk-bootstrap sl.interposer)
 set_target_properties(Raytracer PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<1:${CMAKE_SOURCE_DIR}/Image>)
 set_property(TARGET Raytracer PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/Image")
 target_compile_features(Raytracer PRIVATE cxx_std_20)
